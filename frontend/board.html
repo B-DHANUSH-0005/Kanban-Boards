@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KanFlow — Board</title>
+    <meta name="description" content="Kanban board detail — manage tasks across Todo, Doing, and Done columns." />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+    <!-- ── Topbar ─────────────────────────────────────────────── -->
+    <header class="topbar">
+        <div class="logo">
+            <h1>Kanban Boards</h1>
+        </div>
+        <a href="/" class="btn btn-ghost btn-sm">← Back to Boards</a>
+    </header>
+
+    <!-- ── Main ───────────────────────────────────────────────── -->
+    <main class="container">
+        <div class="board-header">
+            <div>
+                <h1 class="board-title-text" id="boardTitle">Loading…</h1>
+                <p class="page-subtitle" id="boardDesc"></p>
+            </div>
+            <button class="btn btn-primary" id="openAddTask">+ Add Task</button>
+        </div>
+
+        <!-- ── Columns ───────────────────────────────────────────── -->
+        <div class="columns-wrapper">
+
+            <!-- Todo -->
+            <div class="column col-todo" id="col-todo" data-status="todo" ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'todo')">
+                <div class="column-header">
+                    <span class="column-label"><span class="dot dot-todo"></span>Todo</span>
+                    <span class="task-count" id="count-todo">0</span>
+                </div>
+                <div class="tasks-list" id="tasks-todo"></div>
+            </div>
+
+            <!-- Doing -->
+            <div class="column col-doing" id="col-doing" data-status="doing" ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'doing')">
+                <div class="column-header">
+                    <span class="column-label"><span class="dot dot-doing"></span>Doing</span>
+                    <span class="task-count" id="count-doing">0</span>
+                </div>
+                <div class="tasks-list" id="tasks-doing"></div>
+            </div>
+
+            <!-- Done -->
+            <div class="column col-done" id="col-done" data-status="done" ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'done')">
+                <div class="column-header">
+                    <span class="column-label"><span class="dot dot-done"></span>Done</span>
+                    <span class="task-count" id="count-done">0</span>
+                </div>
+                <div class="tasks-list" id="tasks-done"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ── Add Task Modal ─────────────────────────────────────── -->
+    <div class="modal-backdrop" id="addTaskModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+            <h2 class="modal-title" id="taskModalTitle"> Add Task </h2>
+            <div class="form-group">
+                <label for="taskTitle">Title *</label>
+                <input type="text" id="taskTitle" placeholder="e.g. Design the login screen" maxlength="120"
+                    autocomplete="off" />
+            </div>
+            <div class="form-group">
+                <label for="taskDesc">Description</label>
+                <textarea id="taskDesc" rows="3" placeholder="Optional details…"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="taskStatus">Column</label>
+                <select id="taskStatus">
+                    <option value="todo">Todo</option>
+                    <option value="doing">Doing</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="cancelAddTask">Cancel</button>
+                <button class="btn btn-primary" id="submitAddTask">Add Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast ──────────────────────────────────────────────── -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ── Custom Confirmation Dialog ────────────────────────── -->
+    <div class="dialog-backdrop" id="customConfirmModal">
+        <div class="dialog-box">
+            <h3 class="dialog-title" id="confirmTitle">Confirm Action</h3>
+            <p class="dialog-msg" id="confirmMsg">Are you sure you want to proceed?</p>
+            <div class="dialog-actions">
+                <button class="btn btn-ghost" id="confirmCancelBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmOkBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Success Overlay ────────────────────────────────────── -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="tick-wrapper">
+            <svg class="tick-svg" viewBox="0 0 52 52">
+                <circle class="tick-circle" cx="26" cy="26" r="25" fill="none" />
+                <path class="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+            </svg>
+        </div>
+        <p class="success-msg" id="successMsg">Action Successful</p>
+    </div>
+
+    <script src="/static/board.js"></script>
+</body>
+
+</html>

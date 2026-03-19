@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kanban — Boards</title>
+    <meta name="description" content="Manage your Kanban boards — create, view and delete boards." />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+    <!-- ── Topbar ─────────────────────────────────────────────── -->
+    <header class="topbar">
+        <div class="logo">
+            <h1>Kanban Boards</h1>
+        </div>
+        <button class="btn btn-primary" id="openCreateBoard">
+            + New Board
+        </button>
+    </header>
+
+    <!-- ── Main ───────────────────────────────────────────────── -->
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">My Boards</h1>
+                <p class="page-subtitle">Click a board and CRUD</p>
+            </div>
+        </div>
+
+        <div class="boards-grid" id="boardsGrid">
+            <!-- Cards injected by JS -->
+        </div>
+    </main>
+
+    <!-- ── Create Board Modal ─────────────────────────────────── -->
+    <div class="modal-backdrop" id="createBoardModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="boardModalTitle">
+            <h2 class="modal-title" id="boardModalTitle"> Create New Board</h2>
+            <div class="form-group">
+                <label for="boardName">Board Name *</label>
+                <input type="text" id="boardName" placeholder="e.g. Sprint 1" maxlength="80" autocomplete="off" />
+            </div>
+            <div class="form-group">
+                <label for="boardDesc">Description</label>
+                <textarea id="boardDesc" rows="3" placeholder="What is this board about?"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="cancelCreateBoard">Cancel</button>
+                <button class="btn btn-primary" id="submitCreateBoard">Create Board</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast ──────────────────────────────────────────────── -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ── Custom Confirmation Dialog ────────────────────────── -->
+    <div class="dialog-backdrop" id="customConfirmModal">
+        <div class="dialog-box">
+            <h3 class="dialog-title" id="confirmTitle">Confirm Action</h3>
+            <p class="dialog-msg" id="confirmMsg">Are you sure you want to proceed?</p>
+            <div class="dialog-actions">
+                <button class="btn btn-ghost" id="confirmCancelBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmOkBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Success Overlay ────────────────────────────────────── -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="tick-wrapper">
+            <svg class="tick-svg" viewBox="0 0 52 52">
+                <circle class="tick-circle" cx="26" cy="26" r="25" fill="none"/>
+                <path class="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+        </div>
+        <p class="success-msg" id="successMsg">Action Successful</p>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
