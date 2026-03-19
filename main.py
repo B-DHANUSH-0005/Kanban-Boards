@@ -9,12 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from db import create_tables
-from routers import boards, tasks
+from routers import boards, tasks, auth
 
 app = FastAPI(title="Kanban Board API", version="1.0.0")
 
 app.include_router(boards.router)
 app.include_router(tasks.router)
+app.include_router(auth.router)
 
 # ── CORS ──────────────────────────────────────────────────────
 app.add_middleware(
@@ -39,6 +40,16 @@ def serve_index():
 @app.get("/board")
 def serve_board():
     return FileResponse(os.path.join(FRONTEND_DIR, "board.html"))
+
+
+@app.get("/login")
+def serve_login():
+    return FileResponse(os.path.join(FRONTEND_DIR, "login.html"))
+
+
+@app.get("/register")
+def serve_register():
+    return FileResponse(os.path.join(FRONTEND_DIR, "register.html"))
 
 
 # ── Startup ───────────────────────────────────────────────────

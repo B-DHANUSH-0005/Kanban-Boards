@@ -7,6 +7,11 @@
     <title>Kanban — Boards</title>
     <meta name="description" content="Manage your Kanban boards — create, view and delete boards." />
     <link rel="stylesheet" href="/static/style.css" />
+    <script>
+        if (!localStorage.getItem('username')) {
+            window.location.href = '/login';
+        }
+    </script>
 </head>
 
 <body>
@@ -73,8 +78,8 @@
     <div class="success-overlay" id="successOverlay">
         <div class="tick-wrapper">
             <svg class="tick-svg" viewBox="0 0 52 52">
-                <circle class="tick-circle" cx="26" cy="26" r="25" fill="none"/>
-                <path class="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                <circle class="tick-circle" cx="26" cy="26" r="25" fill="none" />
+                <path class="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
             </svg>
         </div>
         <p class="success-msg" id="successMsg">Action Successful</p>

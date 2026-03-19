@@ -37,6 +37,14 @@ def create_tables():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     cur.close()
     conn.close()

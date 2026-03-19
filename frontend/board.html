@@ -7,6 +7,11 @@
     <title>KanFlow — Board</title>
     <meta name="description" content="Kanban board detail — manage tasks across Todo, Doing, and Done columns." />
     <link rel="stylesheet" href="/static/style.css" />
+    <script>
+        if (!localStorage.getItem('username')) {
+            window.location.href = '/login';
+        }
+    </script>
 </head>
 
 <body>

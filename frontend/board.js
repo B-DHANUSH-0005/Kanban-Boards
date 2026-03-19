@@ -86,7 +86,16 @@ async function loadTasks() {
 /* ── Build a task card DOM element ───────────────────────── */
 function buildTaskCard(task) {
   const div = document.createElement("div");
-  div.className = "task-card";
+  
+  // Sticky note styling
+  const colors = ["color-green", "color-yellow", "color-blue"];
+  const rotations = ["rotate-left", "rotate-right", "rotate-none"];
+  
+  // Deterministic choice based on task.id to keep colors consistent
+  const colorIndex = (typeof task.id === 'number' ? task.id : parseInt(task.id) || 0) % colors.length;
+  const rotationIndex = (typeof task.id === 'number' ? task.id : parseInt(task.id) || 0) % rotations.length;
+  
+  div.className = `task-card ${colors[colorIndex]} ${rotations[rotationIndex]}`;
   div.setAttribute("draggable", "true");
   div.dataset.taskId = task.id;
   div.dataset.status = task.status;

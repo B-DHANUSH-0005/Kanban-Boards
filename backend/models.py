@@ -53,3 +53,20 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     status: str
     created_at: Optional[datetime] = None
+
+
+# ── User Models ───────────────────────────────────────────────
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+
+class UserLogin(BaseModel) :
+    username: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    message: Optional[str] = None
+    username: str
+    created_at: Optional[datetime] = None
