@@ -5,7 +5,7 @@
 
 const API = "";
 const params = new URLSearchParams(window.location.search);
-const BOARD_ID = params.get("id");
+const BOARD_ID = parseInt(params.get("id"), 10);  // Must be int for JSON body
 
 let draggedTaskId = null;
 let editingTaskId = null;
@@ -20,6 +20,28 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.classList.remove("show"), 3000);
 }
 
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function logout() {
+    localStorage.removeItem("username");
+    document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    window.location.href = "/login";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const userDisplay = document.getElementById("userDisplay");
+    const storedUsername = localStorage.getItem("username") || getCookie("username");
+    if (userDisplay && storedUsername) {
+        userDisplay.textContent = `Hi, ${storedUsername}`;
+    }
+});
+
 function escHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -28,9 +50,10 @@ function escHtml(str) {
 
 /* ── Load board info ──────────────────────────────────────── */
 async function loadBoard() {
-  if (!BOARD_ID) { window.location.href = "/"; return; }
+  if (!BOARD_ID || isNaN(BOARD_ID)) { window.location.href = "/"; return; }
   try {
-    const res = await fetch(`${API}/boards/${BOARD_ID}`);
+    const url = `${API}/boards/${BOARD_ID}`;
+    const res = await fetch(url);
     if (!res.ok) { window.location.href = "/"; return; }
     const board = await res.json();
     document.getElementById("boardTitle").textContent = board.name;
@@ -44,7 +67,8 @@ async function loadBoard() {
 /* ── Load all boards for transfer ─────────────────────────── */
 async function loadAllBoards() {
   try {
-    const res = await fetch(`${API}/boards`);
+    const url = `${API}/boards`;
+    const res = await fetch(url);
     if (res.ok) {
       allBoards = await res.json();
     }
@@ -89,13 +113,10 @@ function buildTaskCard(task) {
   
   // Sticky note styling
   const colors = ["color-green", "color-yellow", "color-blue"];
-  const rotations = ["rotate-left", "rotate-right", "rotate-none"];
-  
-  // Deterministic choice based on task.id to keep colors consistent
   const colorIndex = (typeof task.id === 'number' ? task.id : parseInt(task.id) || 0) % colors.length;
-  const rotationIndex = (typeof task.id === 'number' ? task.id : parseInt(task.id) || 0) % rotations.length;
+  const rotation = "rotate-none";
   
-  div.className = `task-card ${colors[colorIndex]} ${rotations[rotationIndex]}`;
+  div.className = `task-card ${colors[colorIndex]} ${rotation}`;
   div.setAttribute("draggable", "true");
   div.dataset.taskId = task.id;
   div.dataset.status = task.status;
@@ -156,8 +177,7 @@ async function saveTask() {
 
   if (!title) { showToast("Task title is required", true); return; }
 
-  const boardIdInt = parseInt(BOARD_ID);
-  const taskData = { board_id: boardIdInt, title, description: desc || null, status };
+  const taskData = { board_id: BOARD_ID, title, description: desc || null, status };
   const method = editingTaskId ? "PUT" : "POST";
   const url = editingTaskId ? `${API}/tasks/${editingTaskId}` : `${API}/tasks`;
 

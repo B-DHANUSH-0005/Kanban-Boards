@@ -1,49 +1,74 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Depends, Response
 from db import get_connection
 from models import UserCreate, UserLogin, UserResponse
-from typing import Optional
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
+def hash_password(password: str):
+    return pwd_context.hash(password)
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def verify_password(plain_password, hashed_password):
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
+
+@router.post("/register", response_model=UserResponse)
 def register(user: UserCreate):
     conn = get_connection()
     cur = conn.cursor()
     
-    # Check if user already exists
-    cur.execute("SELECT username FROM users WHERE username = %s", (user.username,))
+    # Check if user exists
+    cur.execute('SELECT "User_id" FROM users WHERE username = %s', (user.username,))
     if cur.fetchone():
         cur.close()
         conn.close()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
+        raise HTTPException(status_code=400, detail="Username already registered")
     
+    hashed_pwd = hash_password(user.password)
     cur.execute(
-        "INSERT INTO users (username, password) VALUES (%s, %s) RETURNING username, created_at",
-        (user.username, user.password)
+        'INSERT INTO users (username, password) VALUES (%s, %s) RETURNING username, created_at',
+        (user.username, hashed_pwd)
     )
     row = cur.fetchone()
     conn.commit()
     cur.close()
     conn.close()
     
-    return {"message": "User registered successfully!", "username": row[0], "created_at": row[1]}
+    return {"message": "User registered successfully", "username": row[0], "created_at": row[1]}
 
-
-@router.post("/login", response_model=UserResponse)
-def login(user: UserLogin):
+@router.post("/login")
+def login(user: UserLogin, response: Response):
     conn = get_connection()
     cur = conn.cursor()
     
-    cur.execute("SELECT username, password, created_at FROM users WHERE username = %s", (user.username,))
+    cur.execute('SELECT "User_id", username, password FROM users WHERE username = %s', (user.username,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not row or not verify_password(user.password, row[2]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
-    if row[1] != user.password:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+    # In a real app, use JWT. For now, we'll use a simple cookie as requested.
+    response.set_cookie(
+        key="user_id", 
+        value=str(row[0]), 
+        path="/", 
+        httponly=False,  # Allow debugging tools to see it
+        samesite="lax",
+        secure=False     # For local testing over HTTP
+    )
+    response.set_cookie(
+        key="username", 
+        value=row[1], 
+        path="/", 
+        httponly=False,
+        samesite="lax",
+        secure=False
+    )
     
-    return {"message": "Login successful!", "username": row[0], "created_at": row[2]}
+    return {"message": "Login successful", "username": row[1], "user_id": row[0]}

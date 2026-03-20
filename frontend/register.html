@@ -4,15 +4,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kanban Boards — Register</title>
+    <title>KanFlow — Register</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .auth-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+
+        .auth-title {
+            background: linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .auth-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 
 <body class="auth-page">
     <div class="auth-container">
-        <div class="auth-card red-line">
-            <h2 class="auth-title">Register for Kanban Boards</h2>
-            <div id="registerError" class="error-msg" style="display: none;"></div>
+        <div class="auth-card">
+            <h2 class="auth-title">Join Boards</h2>
+            <p class="auth-subtitle">Create an account to start organizing your work</p>
+
+            <div id="registerError" class="error-msg"
+                style="display: none; padding: 1rem; background: #fff1f2; border-radius: var(--radius-sm); margin-bottom: 1.5rem; color: var(--accent-danger); font-weight: 600; text-align: center;">
+            </div>
 
             <form id="registerForm" class="auth-form">
                 <div class="form-group">
@@ -22,15 +50,29 @@
 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="Choose a password" required
-                        autocomplete="new-password">
+                    <div class="password-wrapper" style="position: relative;">
+                        <input type="password" id="password" placeholder="Choose a password" required
+                            autocomplete="new-password">
+                        <button type="button" class="toggle-password" aria-label="Toggle password visibility"
+                            style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                            <span class="eye-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="feather feather-eye">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">Register</button>
+                <button type="submit" class="btn btn-primary btn-block" style="height: 3rem; font-size: 1rem;">Create
+                    Account</button>
             </form>
 
             <p class="auth-footer">
-                Already have an account? <a href="/login">Login</a>
+                Already have an account? <a href="/login">Log in</a>
             </p>
         </div>
     </div>

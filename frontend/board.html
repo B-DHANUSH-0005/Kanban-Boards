@@ -7,11 +7,6 @@
     <title>KanFlow — Board</title>
     <meta name="description" content="Kanban board detail — manage tasks across Todo, Doing, and Done columns." />
     <link rel="stylesheet" href="/static/style.css" />
-    <script>
-        if (!localStorage.getItem('username')) {
-            window.location.href = '/login';
-        }
-    </script>
 </head>
 
 <body>
@@ -19,9 +14,14 @@
     <!-- ── Topbar ─────────────────────────────────────────────── -->
     <header class="topbar">
         <div class="logo">
-            <h1>Kanban Boards</h1>
+            <h1>KanFlow</h1>
         </div>
-        <a href="/" class="btn btn-ghost btn-sm">← Back to Boards</a>
+        <div class="topbar-actions">
+            <span id="userDisplay" class="user-display"
+                style="margin-right: 1.5rem; font-weight: 500; color: var(--text-secondary);"></span>
+            <button onclick="window.location.href='/'" class="btn btn-ghost btn-sm" style="margin-right: 1rem;">Back to Boards</button>
+            <button onclick="logout()" class="btn btn-ghost btn-sm">Logout</button>
+        </div>
     </header>
 
     <!-- ── Main ───────────────────────────────────────────────── -->
@@ -31,7 +31,7 @@
                 <h1 class="board-title-text" id="boardTitle">Loading…</h1>
                 <p class="page-subtitle" id="boardDesc"></p>
             </div>
-            <button class="btn btn-primary" id="openAddTask">+ Add Task</button>
+            <button id="openAddTask" class="btn btn-primary btn-sm">&#x2b; Add Task</button>
         </div>
 
         <!-- ── Columns ───────────────────────────────────────────── -->
