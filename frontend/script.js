@@ -7,6 +7,7 @@ const API = "";   // same origin — FastAPI at localhost:8000
 let editingBoardId = null;
 let allBoardsData = [];
 
+
 /* ── Helpers ──────────────────────────────────────────────── */
 function showToast(msg, isError = false) {
     const t = document.getElementById("toast");
@@ -17,16 +18,39 @@ function showToast(msg, isError = false) {
 }
 
 function formatDate(iso) {
-    return new Date(iso).toLocaleDateString("en-IN", {
-        day: "numeric", month: "short", year: "numeric"
-    });
+    if (!iso) return "Today";
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function logout() {
+    localStorage.removeItem("username");
+    document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    window.location.href = "/login";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const userDisplay = document.getElementById("userDisplay");
+    const storedUsername = localStorage.getItem("username") || getCookie("username");
+    if (userDisplay && storedUsername) {
+        userDisplay.textContent = `Hi, ${storedUsername}`;
+    }
+});
 
 async function loadBoards() {
     const grid = document.getElementById("boardsGrid");
     grid.innerHTML = `<p style="color:var(--text-muted);padding:2rem 0">Loading boards…</p>`;
     try {
-        const res = await fetch(`${API}/boards`);
+        const url = `${API}/boards`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load boards");
         allBoardsData = await res.json();
 
@@ -134,7 +158,8 @@ async function deleteBoard(e, id) {
     if (!confirmed) return;
 
     try {
-        const res = await fetch(`${API}/boards/${id}`, { method: "DELETE" });
+        const url = `${API}/boards/${id}`;
+        const res = await fetch(url, { method: "DELETE" });
         if (!res.ok) throw new Error("Failed to delete board");
         showSuccessTick("Board Deleted");
         loadBoards();
@@ -151,7 +176,8 @@ async function mergeBoard(e, sourceId, targetId, targetName) {
     if (!confirmed) return;
 
     try {
-        const res = await fetch(`${API}/boards/${sourceId}/merge`, {
+        const url = `${API}/boards/${sourceId}/merge`;
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ target_board_id: targetId })

@@ -12,39 +12,47 @@ def get_connection():
 
 
 def create_tables():
+    """Create users, boards, and tasks tables if they don't exist."""
     conn = get_connection()
     cur = conn.cursor()
-
-    cur.execute("CREATE SEQUENCE IF NOT EXISTS board_id_seq;")
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS boards (
-            id VARCHAR(5) DEFAULT to_char(nextval('board_id_seq'), 'FM00000') PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cur.execute("CREATE SEQUENCE IF NOT EXISTS task_id_seq;")
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id VARCHAR(9) DEFAULT 'task_' || to_char(nextval('task_id_seq'), 'FM0000') PRIMARY KEY,
-            board_id VARCHAR(5) REFERENCES boards(id) ON DELETE CASCADE,
-            title TEXT NOT NULL,
-            description TEXT,
-            status TEXT DEFAULT 'to do',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
+    
+    # Create users table (matching the actual schema found)
+    # Using "User_id" with double quotes to match the case-sensitive name from schema check
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
+            "User_id" SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
+            "hashed password" TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
+    
+    # Create boards table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS boards (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users("User_id"),
+            name TEXT NOT NULL,
+            description TEXT,
+            owner_username TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Create tasks table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id SERIAL PRIMARY KEY,
+            board_id INTEGER REFERENCES boards(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            description TEXT,
+            status TEXT DEFAULT 'todo',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     conn.commit()
+    print("[OK] Database tables ready")
     cur.close()
     conn.close()

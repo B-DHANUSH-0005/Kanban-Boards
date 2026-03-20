@@ -18,6 +18,7 @@ class BoardMerge(BaseModel):
     target_board_id: int
 
 
+
 class BoardResponse(BaseModel):
     message: Optional[str] = None
     id: int
@@ -29,6 +30,7 @@ class BoardResponse(BaseModel):
 # ── Task Models ───────────────────────────────────────────────
 class TaskCreate(BaseModel):
     board_id: int
+
     title: str
     description: Optional[str] = None
     status: Optional[str] = "todo"   # "todo" | "doing" | "done"
@@ -41,6 +43,7 @@ class TaskUpdate(BaseModel):
     board_id: Optional[int] = None
 
 
+
 class TaskMove(BaseModel):
     status: str   # todo | doing | done
 
@@ -49,6 +52,7 @@ class TaskResponse(BaseModel):
     message: Optional[str] = None
     id: int
     board_id: int
+
     title: str
     description: Optional[str]
     status: str
