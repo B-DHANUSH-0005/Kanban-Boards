@@ -295,21 +295,65 @@ async function moveTaskToBoard(taskId, newBoardId) {
 function toggleTaskMenu(e, taskId) {
   e.stopPropagation();
   const menu = document.getElementById(`menu-${taskId}`);
-  const card = menu.closest(".task-card");
+  const btn = e.currentTarget;
   const isActive = menu.classList.contains("active");
   closeAllMenus();
   if (!isActive) {
+    // Move menu to body to escape overflow/scroll containers
+    document.body.appendChild(menu);
     menu.classList.add("active");
-    card.classList.add("menu-active");
+    positionMenu(menu, btn);
+    menu.dataset.taskId = taskId;
+    // Update card active state
+    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (card) card.classList.add("menu-active");
   }
 }
 
+function positionMenu(menu, btn) {
+  const rect = btn.getBoundingClientRect();
+  menu.style.position = "fixed";
+  menu.style.top = (rect.bottom + 4) + "px";
+  menu.style.left = "auto";
+  // Position so right edge of menu aligns with right edge of button
+  const menuWidth = 180;
+  let left = rect.right - menuWidth;
+  if (left < 8) left = 8; // clamp to viewport edge
+  menu.style.right = "auto";
+  menu.style.left = left + "px";
+  menu.style.zIndex = "9999";
+}
+
 function closeAllMenus() {
-  document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("active"));
+  // Return any floating menus back to their original card footer containers
+  document.querySelectorAll(".dropdown-menu.active").forEach(menu => {
+    const taskId = menu.dataset.taskId || menu.id.replace("menu-", "");
+    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (card) {
+      const container = card.querySelector(".task-menu-container");
+      if (container) container.appendChild(menu);
+      card.classList.remove("menu-active");
+    }
+    menu.classList.remove("active");
+    // Reset inline positioning
+    menu.style.position = "";
+    menu.style.top = "";
+    menu.style.left = "";
+    menu.style.right = "";
+    menu.style.zIndex = "";
+  });
   document.querySelectorAll(".task-card").forEach(c => c.classList.remove("menu-active"));
 }
 
 window.addEventListener("click", closeAllMenus);
+
+// Close menu on scroll of any container EXCEPT the dropdown itself
+window.addEventListener("scroll", (e) => {
+  const openMenu = document.querySelector(".dropdown-menu.active");
+  if (openMenu && !openMenu.contains(e.target)) {
+    closeAllMenus();
+  }
+}, true);
 
 /* ── Custom Dialog Helpers ───────────────────────────────── */
 function confirmAction(title, msg, okText = "Delete") {
