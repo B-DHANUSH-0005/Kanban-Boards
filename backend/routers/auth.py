@@ -18,37 +18,36 @@ def verify_password(plain_password, hashed_password):
 
 @router.post("/register", response_model=UserResponse)
 def register(user: UserCreate):
-    conn = get_connection()
-    cur = conn.cursor()
-    
-    # Check if user exists
-    cur.execute('SELECT "User_id" FROM users WHERE username = %s', (user.username,))
-    if cur.fetchone():
+    from db import db_conn
+    with db_conn() as conn:
+        cur = conn.cursor()
+        
+        # Check if user exists
+        cur.execute('SELECT "User_id" FROM users WHERE username = %s', (user.username,))
+        if cur.fetchone():
+            cur.close()
+            raise HTTPException(status_code=400, detail="Username already registered")
+        
+        hashed_pwd = hash_password(user.password)
+        cur.execute(
+            'INSERT INTO users (username, password) VALUES (%s, %s) RETURNING username, created_at',
+            (user.username, hashed_pwd)
+        )
+        row = cur.fetchone()
+        conn.commit()
         cur.close()
-        conn.close()
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
-    hashed_pwd = hash_password(user.password)
-    cur.execute(
-        'INSERT INTO users (username, password) VALUES (%s, %s) RETURNING username, created_at',
-        (user.username, hashed_pwd)
-    )
-    row = cur.fetchone()
-    conn.commit()
-    cur.close()
-    conn.close()
     
     return {"message": "User registered successfully", "username": row[0], "created_at": row[1]}
 
 @router.post("/login")
 def login(user: UserLogin, response: Response):
-    conn = get_connection()
-    cur = conn.cursor()
-    
-    cur.execute('SELECT "User_id", username, password FROM users WHERE username = %s', (user.username,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
+    from db import db_conn
+    with db_conn() as conn:
+        cur = conn.cursor()
+        
+        cur.execute('SELECT "User_id", username, password FROM users WHERE username = %s', (user.username,))
+        row = cur.fetchone()
+        cur.close()
     
     if not row or not verify_password(user.password, row[2]):
         raise HTTPException(status_code=401, detail="Invalid username or password")

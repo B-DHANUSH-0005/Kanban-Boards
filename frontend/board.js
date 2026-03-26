@@ -48,63 +48,88 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/* ── Load board info ──────────────────────────────────────── */
-async function loadBoard() {
-  if (!BOARD_ID || isNaN(BOARD_ID)) { window.location.href = "/"; return; }
-  try {
-    const url = `${API}/boards/${BOARD_ID}`;
-    const res = await fetch(url);
-    if (!res.ok) { window.location.href = "/"; return; }
-    const board = await res.json();
-    document.getElementById("boardTitle").textContent = board.name;
-    document.getElementById("boardDesc").textContent = board.description || "";
-    document.title = `KanFlow — ${board.name}`;
-  } catch {
-    window.location.href = "/";
-  }
-}
+/* ── Load Board Bundle (Board + Tasks + All Boards) ───────── */
+async function loadFullBoardData() {
+  const cacheKeyBoard = `kanban_board_${BOARD_ID}`;
+  const cacheKeyTasks = `kanban_tasks_${BOARD_ID}`;
+  const cacheKeyAllBoards = `kanban_boards`;
 
-/* ── Load all boards for transfer ─────────────────────────── */
-async function loadAllBoards() {
+  // 1. Try Cache First
+  const cachedBoard = localStorage.getItem(cacheKeyBoard);
+  const cachedTasks = localStorage.getItem(cacheKeyTasks);
+  const cachedAllBoards = localStorage.getItem(cacheKeyAllBoards);
+
+  if (cachedBoard) {
+    const board = JSON.parse(cachedBoard);
+    renderBoardInfo(board);
+  }
+  if (cachedTasks) {
+    const tasks = JSON.parse(cachedTasks);
+    renderTasks(tasks);
+  }
+  if (cachedAllBoards) {
+    allBoards = JSON.parse(cachedAllBoards);
+  }
+
   try {
-    const url = `${API}/boards`;
+    const url = `${API}/boards/${BOARD_ID}/bundle`;
     const res = await fetch(url);
-    if (res.ok) {
-      allBoards = await res.json();
+    if (!res.ok) {
+      if (!cachedBoard) window.location.href = "/";
+      return;
     }
+    const data = await res.json();
+
+    // 2. Update Cache & UI
+    if (JSON.stringify(data.board) !== cachedBoard) {
+      localStorage.setItem(cacheKeyBoard, JSON.stringify(data.board));
+      renderBoardInfo(data.board);
+    }
+
+    if (JSON.stringify(data.tasks) !== cachedTasks) {
+      localStorage.setItem(cacheKeyTasks, JSON.stringify(data.tasks));
+      renderTasks(data.tasks);
+    }
+
+    if (JSON.stringify(data.all_boards) !== cachedAllBoards) {
+      localStorage.setItem(cacheKeyAllBoards, JSON.stringify(data.all_boards));
+      allBoards = data.all_boards;
+    }
+
   } catch (e) {
-    console.error("Failed to load boards", e);
+    console.warn("Puller failed", e);
   }
 }
 
-/* ── Load tasks ───────────────────────────────────────────── */
-async function loadTasks() {
+function renderBoardInfo(board) {
+  document.getElementById("boardTitle").textContent = board.name;
+  document.getElementById("boardDesc").textContent = board.description || "";
+  document.title = `KanFlow — ${board.name}`;
+}
+
+function renderTasks(tasks) {
   // Clear all columns
   ["todo", "doing", "done"].forEach(s => {
-    document.getElementById(`tasks-${s}`).innerHTML = "";
-    document.getElementById(`count-${s}`).textContent = "0";
+    const list = document.getElementById(`tasks-${s}`);
+    if (list) list.innerHTML = "";
+    const count = document.getElementById(`count-${s}`);
+    if (count) count.textContent = "0";
   });
 
-  try {
-    const res = await fetch(`${API}/tasks?board_id=${BOARD_ID}`);
-    if (!res.ok) throw new Error("Failed to load tasks");
-    const tasks = await res.json();
+  const counts = { todo: 0, doing: 0, done: 0 };
 
-    const counts = { todo: 0, doing: 0, done: 0 };
+  tasks.forEach(task => {
+    const status = task.status in counts ? task.status : "todo";
+    counts[status]++;
+    const el = buildTaskCard(task);
+    const container = document.getElementById(`tasks-${status}`);
+    if (container) container.appendChild(el);
+  });
 
-    tasks.forEach(task => {
-      const status = task.status in counts ? task.status : "todo";
-      counts[status]++;
-      const el = buildTaskCard(task);
-      document.getElementById(`tasks-${status}`).appendChild(el);
-    });
-
-    Object.entries(counts).forEach(([s, n]) => {
-      document.getElementById(`count-${s}`).textContent = n;
-    });
-  } catch (e) {
-    showToast(e.message, true);
-  }
+  Object.entries(counts).forEach(([s, n]) => {
+    const el = document.getElementById(`count-${s}`);
+    if (el) el.textContent = n;
+  });
 }
 
 /* ── Build a task card DOM element ───────────────────────── */
@@ -191,7 +216,7 @@ async function saveTask() {
     const isEdit = !!editingTaskId;
     closeTaskModal();
     showToast(isEdit ? "Changes saved" : "Task added successfully!");
-    loadTasks();
+    loadFullBoardData();
   } catch (e) {
     showToast(e.message, true);
   }
@@ -227,7 +252,7 @@ async function deleteTask(e, id) {
     const res = await fetch(`${API}/tasks/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete task");
     showSuccessTick("Task Deleted");
-    loadTasks();
+    loadFullBoardData();
   } catch (e) {
     showToast(e.message, true);
   }
@@ -284,7 +309,7 @@ async function moveTaskToBoard(taskId, newBoardId) {
     });
     if (!res.ok) throw new Error("Failed to transfer task");
     showSuccessTick("Task Moved");
-    loadTasks();
+    loadFullBoardData();
   } catch (e) {
     showToast(e.message, true);
   }
@@ -446,11 +471,36 @@ document.getElementById("taskTitle").addEventListener("keydown", e => {
   if (e.key === "Enter") saveTask();
 });
 
+/* ── Puller (Background Sync) ──────────────────────────────── */
+const PULL_INTERVAL = 10000; // 10 seconds for tasks
+let pullerTimer = null;
+
+function startPuller() {
+  stopPuller();
+  pullerTimer = setInterval(() => {
+    if (!document.hidden) loadFullBoardData();
+  }, PULL_INTERVAL);
+}
+
+function stopPuller() {
+  if (pullerTimer) clearInterval(pullerTimer);
+}
+
 /* ── Init ─────────────────────────────────────────────────── */
 async function init() {
-  await loadBoard();
-  await loadAllBoards();
-  await loadTasks();
+  if (!BOARD_ID || isNaN(BOARD_ID)) { window.location.href = "/"; return; }
+  await loadFullBoardData();
+  startPuller();
 }
+
+// Restart puller when tab becomes visible
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+        loadFullBoardData(); // Immediate refresh
+        startPuller();
+    } else {
+        stopPuller();
+    }
+});
 
 init();

@@ -45,34 +45,51 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+/* ── Load boards ─────────────────────────────────────────── */
 async function loadBoards() {
     const grid = document.getElementById("boardsGrid");
-    grid.innerHTML = `<p style="color:var(--text-muted);padding:2rem 0">Loading boards…</p>`;
+    
+    // 1. Try Cache First (FAST)
+    const cached = localStorage.getItem("kanban_boards");
+    if (cached) {
+        allBoardsData = JSON.parse(cached);
+        grid.innerHTML = allBoardsData.map(b => buildBoardCard(b)).join("");
+    } else {
+        grid.innerHTML = `<p style="color:var(--text-muted);padding:2rem 0">Loading boards…</p>`;
+    }
+
     try {
         const url = `${API}/boards`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load boards");
-        allBoardsData = await res.json();
-
-        if (allBoardsData.length === 0) {
-            grid.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"></div>
-          <p>No boards yet — create your first one!</p>
-        </div>`;
-            return;
+        const freshData = await res.json();
+        
+        // Only update UI if data changed (to avoid flickering)
+        if (JSON.stringify(freshData) !== JSON.stringify(allBoardsData)) {
+            allBoardsData = freshData;
+            localStorage.setItem("kanban_boards", JSON.stringify(allBoardsData));
+            
+            if (allBoardsData.length === 0) {
+                grid.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon"></div>
+              <p>No boards yet — create your first one!</p>
+            </div>`;
+                return;
+            }
+            grid.innerHTML = allBoardsData.map(b => buildBoardCard(b)).join("");
         }
-
-        grid.innerHTML = allBoardsData.map(b => buildBoardCard(b)).join("");
     } catch (e) {
-        grid.innerHTML = `<p style="color:var(--accent-danger)">${e.message}</p>`;
+        if (!cached) {
+            grid.innerHTML = `<p style="color:var(--accent-danger)">${e.message}</p>`;
+        }
     }
 }
 
 /* ── Build Board Card ─────────────────────────────────────── */
 function buildBoardCard(b) {
     return `
-      <div class="board-card" id="board-${b.id}" onclick="goToBoard('${b.id}', event)">
+      <div class="board-card" id="board-${b.id}" onclick="goToBoard('${b.id}', event)" onmouseenter="prefetchBoard('${b.id}')">
         <div class="board-card-top">
           <div class=""></div>
           <div class="task-menu-container">
@@ -102,6 +119,27 @@ function buildBoardCard(b) {
         </div>
       </div>
     `;
+}
+
+/* ── Prefetch Board Details ──────────────────────────────── */
+async function prefetchBoard(id) {
+    const cacheKeyBoard = `kanban_board_${id}`;
+    const cacheKeyTasks = `kanban_tasks_${id}`;
+    
+    // If recently fetched, skip
+    const lastPrefetch = sessionStorage.getItem(`prefetch_${id}`);
+    if (lastPrefetch && Date.now() - lastPrefetch < 10000) return;
+
+    try {
+        const res = await fetch(`${API}/boards/${id}/bundle`);
+        if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem(cacheKeyBoard, JSON.stringify(data.board));
+            localStorage.setItem(cacheKeyTasks, JSON.stringify(data.tasks));
+            sessionStorage.setItem(`prefetch_${id}`, Date.now());
+            console.log(`Prefetched board ${id}`);
+        }
+    } catch (e) {}
 }
 
 /* ── Navigate to board detail ─────────────────────────────── */
@@ -291,5 +329,31 @@ document.getElementById("boardName").addEventListener("keydown", e => {
     if (e.key === "Enter") saveBoard();
 });
 
+/* ── Puller (Background Sync) ──────────────────────────────── */
+const PULL_INTERVAL = 30000; // 30 seconds
+let pullerTimer = null;
+
+function startPuller() {
+    stopPuller();
+    pullerTimer = setInterval(() => {
+        if (!document.hidden) loadBoards();
+    }, PULL_INTERVAL);
+}
+
+function stopPuller() {
+    if (pullerTimer) clearInterval(pullerTimer);
+}
+
 /* ── Init ─────────────────────────────────────────────────── */
 loadBoards();
+startPuller();
+
+// Restart puller when tab becomes visible
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+        loadBoards(); // Immediate refresh
+        startPuller();
+    } else {
+        stopPuller();
+    }
+});
