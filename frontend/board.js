@@ -1,506 +1,582 @@
-/* ================================================================
-   board.js — Board detail page (board.html)
-   Handles task CRUD + HTML5 drag-and-drop column moves
-   ================================================================ */
+/**
+ * board.js — Board detail page
+ *
+ * Architecture:
+ *  - All API calls go through apiFetch() from utils.js (JWT, 401 guard)
+ *  - Single /boards/{id}/bundle endpoint loads board + tasks + boards list
+ *  - Optimistic UI for move/delete (immediate DOM update, rollback on fail)
+ *  - Background puller syncs every 15s only when tab is visible
+ *  - Status is pre-set by which column's "+ Add task" button was clicked
+ */
 
-const API = "";
-const params = new URLSearchParams(window.location.search);
-const BOARD_ID = parseInt(params.get("id"), 10);  // Must be int for JSON body
+"use strict";
 
+// ── Guard & constants ─────────────────────────────────────────
+requireAuth();
+
+const BOARD_ID = parseInt(new URLSearchParams(window.location.search).get("id"), 10);
+if (!BOARD_ID || isNaN(BOARD_ID)) { window.location.replace("/"); }
+
+const STATUSES = ["todo", "doing", "done"];
+const STATUS_LABEL = { todo: "Todo", doing: "Doing", done: "Done" };
+
+// ── Mutable state ─────────────────────────────────────────────
+let allBoards = [];       // [{id, name}, …] for "move to board" menu
+let editingTaskId = null;     // null = create mode
+let activeStatus = "todo";   // which column was clicked for new task
 let draggedTaskId = null;
-let editingTaskId = null;
-let allBoards = [];
+let pullerTimer = null;
+let isSaving = false;    // prevent double-submit
 
-/* ── Helpers ──────────────────────────────────────────────── */
-function showToast(msg, isError = false) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.className = "toast" + (isError ? " error" : "");
-  requestAnimationFrame(() => t.classList.add("show"));
-  setTimeout(() => t.classList.remove("show"), 3000);
-}
+// ── Cache keys ────────────────────────────────────────────────
+const KEY_BOARD = `kb_board_${BOARD_ID}`;
+const KEY_TASKS = `kb_tasks_${BOARD_ID}`;
+const KEY_BOARDS = `kb_all_boards`;
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
-function logout() {
-    localStorage.removeItem("username");
-    document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = "is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    window.location.href = "/login";
-}
-
+// ── Init ──────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-    const userDisplay = document.getElementById("userDisplay");
-    const storedUsername = localStorage.getItem("username") || getCookie("username");
-    if (userDisplay && storedUsername) {
-        userDisplay.textContent = `Hi, ${storedUsername}`;
-    }
+  setUserDisplay();
+
+  // Wire up modal controls
+  document.getElementById("cancelAddTask").addEventListener("click", closeTaskModal);
+  document.getElementById("submitAddTask").addEventListener("click", saveTask);
+
+  document.getElementById("addTaskModal").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("addTaskModal")) closeTaskModal();
+  });
+
+  document.getElementById("taskTitle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTask(); }
+  });
+
+  // Live validation
+  attachLiveValidation(document.getElementById("taskTitle"), "taskTitle");
+  attachLiveValidation(document.getElementById("taskDesc"), "taskDesc");
+
+  // Show cached data immediately (instant paint) then fetch fresh
+  paintFromCache();
+  fetchBundle();
+  startPuller();
+
+  // Visibility sync
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { fetchBundle(); startPuller(); }
+    else { stopPuller(); }
+  });
 });
 
-function escHtml(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// ── Cache-first render ────────────────────────────────────────
+function paintFromCache() {
+  const board = readCache(KEY_BOARD);
+  const tasks = readCache(KEY_TASKS);
+  const boards = readCache(KEY_BOARDS);
+
+  if (board) renderBoardInfo(board);
+  if (tasks) renderTasks(tasks);
+  else showColumnSkeletons();
+  if (boards) allBoards = boards;
 }
 
-/* ── Load Board Bundle (Board + Tasks + All Boards) ───────── */
-async function loadFullBoardData() {
-  const cacheKeyBoard = `kanban_board_${BOARD_ID}`;
-  const cacheKeyTasks = `kanban_tasks_${BOARD_ID}`;
-  const cacheKeyAllBoards = `kanban_boards`;
-
-  // 1. Try Cache First
-  const cachedBoard = localStorage.getItem(cacheKeyBoard);
-  const cachedTasks = localStorage.getItem(cacheKeyTasks);
-  const cachedAllBoards = localStorage.getItem(cacheKeyAllBoards);
-
-  if (cachedBoard) {
-    const board = JSON.parse(cachedBoard);
-    renderBoardInfo(board);
-  }
-  if (cachedTasks) {
-    const tasks = JSON.parse(cachedTasks);
-    renderTasks(tasks);
-  }
-  if (cachedAllBoards) {
-    allBoards = JSON.parse(cachedAllBoards);
-  }
-
+// ── Fetch bundle from server ──────────────────────────────────
+async function fetchBundle() {
   try {
-    const url = `${API}/boards/${BOARD_ID}/bundle`;
-    const res = await fetch(url);
+    const res = await apiFetch(`/boards/${BOARD_ID}/bundle`);
+    if (!res) return;
     if (!res.ok) {
-      if (!cachedBoard) window.location.href = "/";
+      if (!readCache(KEY_BOARD)) window.location.replace("/");
       return;
     }
+
     const data = await res.json();
 
-    // 2. Update Cache & UI
-    if (JSON.stringify(data.board) !== cachedBoard) {
-      localStorage.setItem(cacheKeyBoard, JSON.stringify(data.board));
-      renderBoardInfo(data.board);
-    }
+    // Only re-render if data actually changed (avoids flicker)
+    const boardStr = JSON.stringify(data.board);
+    const tasksStr = JSON.stringify(data.tasks);
+    const boardsStr = JSON.stringify(data.all_boards);
 
-    if (JSON.stringify(data.tasks) !== cachedTasks) {
-      localStorage.setItem(cacheKeyTasks, JSON.stringify(data.tasks));
-      renderTasks(data.tasks);
-    }
+    if (boardStr !== localStorage.getItem(KEY_BOARD)) { saveCache(KEY_BOARD, boardStr); renderBoardInfo(data.board); }
+    if (tasksStr !== localStorage.getItem(KEY_TASKS)) { saveCache(KEY_TASKS, tasksStr); renderTasks(data.tasks); }
+    if (boardsStr !== localStorage.getItem(KEY_BOARDS)) { saveCache(KEY_BOARDS, boardsStr); allBoards = data.all_boards; }
 
-    if (JSON.stringify(data.all_boards) !== cachedAllBoards) {
-      localStorage.setItem(cacheKeyAllBoards, JSON.stringify(data.all_boards));
-      allBoards = data.all_boards;
-    }
-
-  } catch (e) {
-    console.warn("Puller failed", e);
+  } catch (err) {
+    console.warn("[board] fetchBundle error:", err);
   }
 }
 
+// ── Render helpers ────────────────────────────────────────────
 function renderBoardInfo(board) {
   document.getElementById("boardTitle").textContent = board.name;
   document.getElementById("boardDesc").textContent = board.description || "";
-  document.title = `KanFlow — ${board.name}`;
+  document.title = `KanBoards — ${board.name}`;
 }
 
 function renderTasks(tasks) {
-  // Clear all columns
-  ["todo", "doing", "done"].forEach(s => {
+  // Clear task lists
+  STATUSES.forEach((s) => {
     const list = document.getElementById(`tasks-${s}`);
     if (list) list.innerHTML = "";
-    const count = document.getElementById(`count-${s}`);
-    if (count) count.textContent = "0";
   });
 
   const counts = { todo: 0, doing: 0, done: 0 };
 
-  tasks.forEach(task => {
-    const status = task.status in counts ? task.status : "todo";
+  (tasks || []).forEach((task) => {
+    const status = counts.hasOwnProperty(task.status) ? task.status : "todo";
     counts[status]++;
-    const el = buildTaskCard(task);
-    const container = document.getElementById(`tasks-${status}`);
-    if (container) container.appendChild(el);
+    document.getElementById(`tasks-${status}`)?.appendChild(buildTaskCard(task));
   });
 
-  Object.entries(counts).forEach(([s, n]) => {
-    const el = document.getElementById(`count-${s}`);
-    if (el) el.textContent = n;
+  STATUSES.forEach((s) => {
+    const countEl = document.getElementById(`count-${s}`);
+    if (countEl) countEl.textContent = counts[s];
+
+    // Show empty hint if no tasks
+    const list = document.getElementById(`tasks-${s}`);
+    if (list && counts[s] === 0) {
+      list.innerHTML = `<div class="column-empty">No tasks yet</div>`;
+    }
   });
 }
 
-/* ── Build a task card DOM element ───────────────────────── */
-function buildTaskCard(task) {
-  const div = document.createElement("div");
-  
-  // Sticky note styling
-  const colors = ["color-green", "color-yellow", "color-blue"];
-  const colorIndex = (typeof task.id === 'number' ? task.id : parseInt(task.id) || 0) % colors.length;
-  const rotation = "rotate-none";
-  
-  div.className = `task-card ${colors[colorIndex]} ${rotation}`;
-  div.setAttribute("draggable", "true");
-  div.dataset.taskId = task.id;
-  div.dataset.status = task.status;
+function showColumnSkeletons() {
+  STATUSES.forEach((s) => {
+    const list = document.getElementById(`tasks-${s}`);
+    if (list) list.innerHTML = `
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card" style="height:60px"></div>`;
+  });
+}
 
-  div.innerHTML = `
+// ── Build task card ───────────────────────────────────────────
+function buildTaskCard(task) {
+  const card = document.createElement("article");
+  card.className = "task-card";
+  card.draggable = true;
+  card.dataset.taskId = task.id;
+  card.dataset.status = task.status;
+
+  // Build board move items
+  const boardItems = allBoards
+    .filter((b) => b.id !== BOARD_ID)
+    .map((b) => `<div class="menu-item" onclick="moveTaskToBoard(event,'${task.id}',${b.id})">${escHtml(b.name)}</div>`)
+    .join("") || `<div class="menu-item" style="opacity:.5;cursor:default">No other boards</div>`;
+
+  card.innerHTML = `
     <div class="task-card-title">${escHtml(task.title)}</div>
     ${task.description ? `<div class="task-card-desc">${escHtml(task.description)}</div>` : ""}
     <div class="task-card-footer">
       <div class="task-menu-container">
-        <button class="menu-dots-btn" onclick="toggleTaskMenu(event, '${task.id}')">&#x22EE;</button>
+        <button class="menu-dots-btn" onclick="toggleTaskMenu(event,'${task.id}')" aria-label="Task options">&#x22EE;</button>
         <div class="dropdown-menu" id="menu-${task.id}">
-          <div class="menu-item" onclick="editTask('${task.id}')">Edit Task <span>&#x270E;</span></div>
-          
+          <div class="menu-item" onclick="openEditTask('${task.id}')">Edit <span>&#x270E;</span></div>
           <div class="submenu-container">
-            <div class="menu-item">Move to Status <span>&#x203A;</span></div>
+            <div class="menu-item">Move to <span>&#x203A;</span></div>
             <div class="submenu">
-              <div class="menu-item" onclick="moveTask('${task.id}', 'todo')">Todo</div>
-              <div class="menu-item" onclick="moveTask('${task.id}', 'doing')">Doing</div>
-              <div class="menu-item" onclick="moveTask('${task.id}', 'done')">Done</div>
+              ${STATUSES.filter((s) => s !== task.status).map((s) =>
+    `<div class="menu-item" onclick="moveTask(event,'${task.id}','${s}')">${STATUS_LABEL[s]}</div>`
+  ).join("")}
             </div>
           </div>
-
           <div class="submenu-container">
-            <div class="menu-item">Move to Board <span>&#x203A;</span></div>
-            <div class="submenu">
-              ${allBoards.filter(b => b.id != BOARD_ID).map(b => `
-                <div class="menu-item" onclick="moveTaskToBoard('${task.id}', ${b.id})">${escHtml(b.name)}</div>
-              `).join('')}
-              ${allBoards.length <= 1 ? '<div class="menu-item" style="opacity:0.5; cursor:default;">No other boards</div>' : ''}
-            </div>
+            <div class="menu-item">Transfer <span>&#x203A;</span></div>
+            <div class="submenu">${boardItems}</div>
           </div>
-
           <div class="menu-divider"></div>
-          <div class="menu-item danger" onclick="deleteTask(event, '${task.id}')">Delete Task <span>&#x2715;</span></div>
+          <div class="menu-item danger" onclick="deleteTask(event,'${task.id}')">Delete <span>&#x2715;</span></div>
         </div>
       </div>
     </div>`;
 
-  // Drag events
-  div.addEventListener("dragstart", e => {
+  // Drag handlers
+  card.addEventListener("dragstart", (e) => {
     draggedTaskId = task.id;
-    div.classList.add("dragging");
+    card.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", task.id);
   });
-  div.addEventListener("dragend", () => {
-    div.classList.remove("dragging");
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
     draggedTaskId = null;
   });
 
-  return div;
+  return card;
 }
 
-/* ── Save task (Create or Update) ─────────────────────────── */
+// ── Modal open/close ──────────────────────────────────────────
+/**
+ * Open the modal for creating a new task.
+ * @param {string} status - the column that was clicked ('todo'|'doing'|'done')
+ */
+function openTaskModal(status) {
+  editingTaskId = null;
+  activeStatus = status || "todo";
+
+  document.getElementById("taskModalTitle").textContent = `Add to ${STATUS_LABEL[activeStatus]}`;
+  document.getElementById("submitAddTask").textContent = "Add Task";
+  document.getElementById("taskTitle").value = "";
+  document.getElementById("taskDesc").value = "";
+  setFieldError(document.getElementById("taskTitle"), null);
+  setFieldError(document.getElementById("taskDesc"), null);
+
+  // Hide status dropdown when creating (it's set by column button)
+  document.getElementById("statusGroup").style.display = "none";
+
+  document.getElementById("addTaskModal").classList.add("active");
+  setTimeout(() => document.getElementById("taskTitle").focus(), 60);
+}
+
+/**
+ * Open the modal for editing an existing task.
+ * Shows the status dropdown so users can change columns.
+ */
+async function openEditTask(id) {
+  closeAllMenus();
+
+  // Try local DOM first for speed
+  const card = document.querySelector(`.task-card[data-task-id="${id}"]`);
+  const cachedTasks = readCache(KEY_TASKS);
+  const localTask = cachedTasks?.find?.((t) => String(t.id) === String(id));
+
+  if (localTask) {
+    populateEditModal(localTask);
+  } else {
+    // Fallback: fetch from server
+    try {
+      const res = await apiFetch(`/tasks/${id}`);
+      if (!res || !res.ok) { showToast("Could not load task", true); return; }
+      populateEditModal(await res.json());
+    } catch {
+      showToast("Network error", true);
+      return;
+    }
+  }
+}
+
+function populateEditModal(task) {
+  editingTaskId = task.id;
+  activeStatus = task.status;
+
+  document.getElementById("taskModalTitle").textContent = "Edit Task";
+  document.getElementById("submitAddTask").textContent = "Save Changes";
+  document.getElementById("taskTitle").value = task.title;
+  document.getElementById("taskDesc").value = task.description || "";
+  document.getElementById("taskStatus").value = task.status;
+  setFieldError(document.getElementById("taskTitle"), null);
+  setFieldError(document.getElementById("taskDesc"), null);
+
+  // Show status dropdown in edit mode
+  document.getElementById("statusGroup").style.display = "";
+
+  document.getElementById("addTaskModal").classList.add("active");
+  setTimeout(() => document.getElementById("taskTitle").focus(), 60);
+}
+
+function closeTaskModal() {
+  document.getElementById("addTaskModal").classList.remove("active");
+  editingTaskId = null;
+  isSaving = false;
+}
+
+// ── Save task (create or update) ──────────────────────────────
 async function saveTask() {
-  const title = document.getElementById("taskTitle").value.trim();
-  const desc = document.getElementById("taskDesc").value.trim();
-  const status = document.getElementById("taskStatus").value;
+  if (isSaving) return;
 
-  if (!title) { showToast("Task title is required", true); return; }
+  const titleEl = document.getElementById("taskTitle");
+  const descEl = document.getElementById("taskDesc");
+  const statusEl = document.getElementById("taskStatus");
 
-  const taskData = { board_id: BOARD_ID, title, description: desc || null, status };
-  const method = editingTaskId ? "PUT" : "POST";
-  const url = editingTaskId ? `${API}/tasks/${editingTaskId}` : `${API}/tasks`;
+  const titleErr = validateField("taskTitle", titleEl.value);
+  const descErr = validateField("taskDesc", descEl.value);
+  setFieldError(titleEl, titleErr);
+  setFieldError(descEl, descErr);
+  if (titleErr || descErr) { titleEl.focus(); return; }
+
+  // Status: from dropdown (edit) or from which column was clicked (create)
+  const status = editingTaskId ? statusEl.value : activeStatus;
+  const title = titleEl.value.trim();
+  const desc = descEl.value.trim() || null;
+
+  const isEdit = !!editingTaskId;
+  const method = isEdit ? "PUT" : "POST";
+  const url = isEdit ? `/tasks/${editingTaskId}` : `/tasks`;
+  const body = isEdit
+    ? { title, description: desc, status }
+    : { board_id: BOARD_ID, title, description: desc, status };
+
+  // Loading state
+  isSaving = true;
+  const btn = document.getElementById("submitAddTask");
+  btn.classList.add("btn-loading");
+  btn.disabled = true;
 
   try {
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(taskData)
-    });
-    if (!res.ok) throw new Error(`Failed to ${editingTaskId ? 'update' : 'create'} task`);
-    const isEdit = !!editingTaskId;
+    const res = await apiFetch(url, { method, body: JSON.stringify(body) });
+    if (!res) return;
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || "Save failed", true);
+      return;
+    }
+
+    const saved = await res.json();
     closeTaskModal();
-    showToast(isEdit ? "Changes saved" : "Task added successfully!");
-    loadFullBoardData();
-  } catch (e) {
-    showToast(e.message, true);
+
+    if (isEdit) {
+      // Patch the existing card in-place (no full re-render)
+      patchTaskCard(saved);
+      showToast("Task updated");
+    } else {
+      // Prepend new card to correct column
+      addTaskCardToColumn(saved);
+      showToast("Task added");
+    }
+
+    // Invalidate cache so next puller gets fresh data
+    invalidateTaskCache();
+
+  } catch {
+    showToast("Network error — please try again", true);
+  } finally {
+    isSaving = false;
+    btn.classList.remove("btn-loading");
+    btn.disabled = false;
   }
 }
 
-/* ── Edit task ────────────────────────────────────────────── */
-async function editTask(id) {
-  try {
-    const res = await fetch(`${API}/tasks/${id}`);
-    if (!res.ok) throw new Error("Failed to load task details");
-    const task = await res.json();
-    if (!task) throw new Error("Task not found");
+// ── Optimistic DOM helpers ────────────────────────────────────
+function addTaskCardToColumn(task) {
+  const list = document.getElementById(`tasks-${task.status}`);
+  if (!list) return;
 
-    editingTaskId = id;
-    document.getElementById("taskModalTitle").textContent = "Edit Task";
-    document.getElementById("submitAddTask").textContent = "Save Changes";
-    document.getElementById("taskTitle").value = task.title;
-    document.getElementById("taskDesc").value = task.description || "";
-    document.getElementById("taskStatus").value = task.status;
-    document.getElementById("addTaskModal").classList.add("active");
-    document.getElementById("taskTitle").focus();
-  } catch (e) {
-    showToast(e.message, true);
+  // Remove empty placeholder
+  list.querySelector(".column-empty")?.remove();
+
+  // Prepend new card
+  list.insertBefore(buildTaskCard(task), list.firstChild);
+
+  // Increment count
+  const countEl = document.getElementById(`count-${task.status}`);
+  if (countEl) countEl.textContent = parseInt(countEl.textContent || "0") + 1;
+}
+
+function patchTaskCard(task) {
+  const card = document.querySelector(`.task-card[data-task-id="${task.id}"]`);
+  if (!card) { fetchBundle(); return; }   // fallback: full refresh
+
+  const oldStatus = card.dataset.status;
+  const newStatus = task.status;
+
+  // Update text content
+  card.querySelector(".task-card-title").textContent = task.title;
+  const descEl = card.querySelector(".task-card-desc");
+  if (task.description) {
+    if (descEl) descEl.textContent = task.description;
+    else {
+      const d = document.createElement("div");
+      d.className = "task-card-desc";
+      d.textContent = task.description;
+      card.querySelector(".task-card-title").insertAdjacentElement("afterend", d);
+    }
+  } else {
+    descEl?.remove();
+  }
+
+  // Move column if status changed
+  if (oldStatus !== newStatus) {
+    const newList = document.getElementById(`tasks-${newStatus}`);
+    if (newList) {
+      newList.querySelector(".column-empty")?.remove();
+      newList.insertBefore(card, newList.firstChild);
+      card.dataset.status = newStatus;
+
+      // Update counts
+      adjustCount(oldStatus, -1);
+      adjustCount(newStatus, +1);
+    }
   }
 }
 
-/* ── Delete task ──────────────────────────────────────────── */
+function removeTaskCard(taskId) {
+  const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+  if (!card) return;
+  const status = card.dataset.status;
+  card.remove();
+  adjustCount(status, -1);
+
+  // Show empty hint if column is now empty
+  const list = document.getElementById(`tasks-${status}`);
+  if (list && !list.querySelector(".task-card")) {
+    list.innerHTML = `<div class="column-empty">No tasks yet</div>`;
+  }
+}
+
+function adjustCount(status, delta) {
+  const el = document.getElementById(`count-${status}`);
+  if (el) el.textContent = Math.max(0, parseInt(el.textContent || "0") + delta);
+}
+
+// ── Delete task ───────────────────────────────────────────────
 async function deleteTask(e, id) {
   e.stopPropagation();
-  const confirmed = await confirmAction("Delete Task?", "Are you sure you want to remove this task permanently?");
+  closeAllMenus();
+
+  const confirmed = await confirmAction("Delete task?", "This cannot be undone.");
   if (!confirmed) return;
+
+  // Optimistic remove
+  const card = document.querySelector(`.task-card[data-task-id="${id}"]`);
+  const status = card?.dataset.status;
+  card?.remove();
+  if (status) adjustCount(status, -1);
+
   try {
-    const res = await fetch(`${API}/tasks/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete task");
-    showSuccessTick("Task Deleted");
-    loadFullBoardData();
-  } catch (e) {
-    showToast(e.message, true);
+    const res = await apiFetch(`/tasks/${id}`, { method: "DELETE" });
+    if (!res || !res.ok) throw new Error("Delete failed");
+    showSuccessTick("Deleted");
+    invalidateTaskCache();
+  } catch (err) {
+    showToast(err.message, true);
+    fetchBundle();   // restore if it failed
   }
 }
 
-/* ── Move task (drag & drop) ──────────────────────────────── */
-async function moveTask(taskId, newStatus) {
-  // Optimistic UI Update
-  const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
-  const oldStatus = card.dataset.status;
-  const oldParent = card.parentElement;
+// ── Move task status (optimistic) ────────────────────────────
+async function moveTask(e, taskId, newStatus) {
+  e?.stopPropagation();
+  closeAllMenus();
 
+  const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+  if (!card) return;
+  const oldStatus = card.dataset.status;
   if (oldStatus === newStatus) return;
 
-  const targetList = document.getElementById(`tasks-${newStatus}`);
-  targetList.appendChild(card);
+  // Optimistic move
+  const oldList = document.getElementById(`tasks-${oldStatus}`);
+  const newList = document.getElementById(`tasks-${newStatus}`);
+  newList?.querySelector(".column-empty")?.remove();
+  if (newList) newList.insertBefore(card, newList.firstChild);
   card.dataset.status = newStatus;
+  adjustCount(oldStatus, -1);
+  adjustCount(newStatus, +1);
 
-  // Update counts
-  document.getElementById(`count-${oldStatus}`).textContent =
-    parseInt(document.getElementById(`count-${oldStatus}`).textContent) - 1;
-  document.getElementById(`count-${newStatus}`).textContent =
-    parseInt(document.getElementById(`count-${newStatus}`).textContent) + 1;
+  // Empty hint for old column
+  if (oldList && !oldList.querySelector(".task-card")) {
+    oldList.innerHTML = `<div class="column-empty">No tasks yet</div>`;
+  }
 
   try {
-    const res = await fetch(`${API}/tasks/${taskId}/move`, {
+    const res = await apiFetch(`/tasks/${taskId}/move`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus })
+      body: JSON.stringify({ status: newStatus }),
     });
-    if (!res.ok) throw new Error("Move failed on server");
-  } catch (e) {
-    showToast(e.message, true);
+    if (!res || !res.ok) throw new Error("Move failed");
+    invalidateTaskCache();
+  } catch (err) {
+    showToast(err.message, true);
     // Rollback
-    oldParent.appendChild(card);
+    oldList?.querySelector(".column-empty")?.remove();
+    if (oldList) oldList.insertBefore(card, oldList.firstChild);
     card.dataset.status = oldStatus;
-    document.getElementById(`count-${oldStatus}`).textContent =
-      parseInt(document.getElementById(`count-${oldStatus}`).textContent) + 1;
-    document.getElementById(`count-${newStatus}`).textContent =
-      parseInt(document.getElementById(`count-${newStatus}`).textContent) - 1;
+    adjustCount(newStatus, -1);
+    adjustCount(oldStatus, +1);
   }
-  closeAllMenus();
 }
 
-/* ── Move task to other Board ────────────────────────────── */
-async function moveTaskToBoard(taskId, newBoardId) {
-  const confirmed = await confirmAction("Move Task?", "Move this task to another board?", "Move");
+// ── Move task to another board ────────────────────────────────
+async function moveTaskToBoard(e, taskId, newBoardId) {
+  e?.stopPropagation();
+  closeAllMenus();
+
+  const confirmed = await confirmAction("Move task?", "Move this task to another board?", "Move");
   if (!confirmed) return;
+
+  // Optimistic remove from current board
+  removeTaskCard(taskId);
+
   try {
-    const res = await fetch(`${API}/tasks/${taskId}`, {
+    const res = await apiFetch(`/tasks/${taskId}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ board_id: newBoardId })
+      body: JSON.stringify({ board_id: newBoardId }),
     });
-    if (!res.ok) throw new Error("Failed to transfer task");
-    showSuccessTick("Task Moved");
-    loadFullBoardData();
-  } catch (e) {
-    showToast(e.message, true);
+    if (!res || !res.ok) throw new Error("Move failed");
+    showSuccessTick("Moved");
+    invalidateTaskCache();
+  } catch (err) {
+    showToast(err.message, true);
+    fetchBundle();   // restore
   }
-  closeAllMenus();
 }
 
-/* ── Menu Handlers ────────────────────────────────────────── */
+// ── Menu handlers ─────────────────────────────────────────────
 function toggleTaskMenu(e, taskId) {
   e.stopPropagation();
   const menu = document.getElementById(`menu-${taskId}`);
   const btn = e.currentTarget;
-  const isActive = menu.classList.contains("active");
+  const isOpen = menu.classList.contains("active");
+
   closeAllMenus();
-  if (!isActive) {
-    // Move menu to body to escape overflow/scroll containers
+
+  if (!isOpen) {
+    // Teleport menu to body so it escapes overflow:hidden
     document.body.appendChild(menu);
     menu.classList.add("active");
-    positionMenu(menu, btn);
     menu.dataset.taskId = taskId;
-    // Update card active state
-    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
-    if (card) card.classList.add("menu-active");
+    positionMenu(menu, btn);
   }
 }
 
 function positionMenu(menu, btn) {
   const rect = btn.getBoundingClientRect();
-  menu.style.position = "fixed";
-  menu.style.top = (rect.bottom + 4) + "px";
-  menu.style.left = "auto";
-  // Position so right edge of menu aligns with right edge of button
-  const menuWidth = 180;
-  let left = rect.right - menuWidth;
-  if (left < 8) left = 8; // clamp to viewport edge
-  menu.style.right = "auto";
-  menu.style.left = left + "px";
-  menu.style.zIndex = "9999";
+  const menuW = 186;
+  let left = rect.right - menuW;
+  if (left < 8) left = 8;
+
+  menu.style.cssText =
+    `position:fixed;top:${rect.bottom + 4}px;left:${left}px;right:auto;z-index:9999`;
 }
 
 function closeAllMenus() {
-  // Return any floating menus back to their original card footer containers
-  document.querySelectorAll(".dropdown-menu.active").forEach(menu => {
-    const taskId = menu.dataset.taskId || menu.id.replace("menu-", "");
-    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
-    if (card) {
-      const container = card.querySelector(".task-menu-container");
-      if (container) container.appendChild(menu);
-      card.classList.remove("menu-active");
+  document.querySelectorAll(".dropdown-menu.active").forEach((menu) => {
+    const taskId = menu.dataset.taskId;
+    if (taskId) {
+      const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+      card?.querySelector(".task-menu-container")?.appendChild(menu);
     }
     menu.classList.remove("active");
-    // Reset inline positioning
-    menu.style.position = "";
-    menu.style.top = "";
-    menu.style.left = "";
-    menu.style.right = "";
-    menu.style.zIndex = "";
+    menu.style.cssText = "";
   });
-  document.querySelectorAll(".task-card").forEach(c => c.classList.remove("menu-active"));
 }
 
 window.addEventListener("click", closeAllMenus);
+window.addEventListener("scroll", () => { if (document.querySelector(".dropdown-menu.active")) closeAllMenus(); }, true);
 
-// Close menu on scroll of any container EXCEPT the dropdown itself
-window.addEventListener("scroll", (e) => {
-  const openMenu = document.querySelector(".dropdown-menu.active");
-  if (openMenu && !openMenu.contains(e.target)) {
-    closeAllMenus();
-  }
-}, true);
-
-/* ── Custom Dialog Helpers ───────────────────────────────── */
-function confirmAction(title, msg, okText = "Delete") {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("customConfirmModal");
-    const titleEl = document.getElementById("confirmTitle");
-    const msgEl = document.getElementById("confirmMsg");
-    const okBtn = document.getElementById("confirmOkBtn");
-    const cancelBtn = document.getElementById("confirmCancelBtn");
-
-    titleEl.textContent = title;
-    msgEl.textContent = msg;
-    okBtn.textContent = okText;
-
-    okBtn.className = "btn " + (okText === "Delete" ? "btn-danger" : "btn-primary");
-
-    const close = (res) => {
-      modal.classList.remove("active");
-      okBtn.onclick = null;
-      cancelBtn.onclick = null;
-      resolve(res);
-    };
-
-    okBtn.onclick = () => close(true);
-    cancelBtn.onclick = () => close(false);
-    modal.classList.add("active");
-  });
-}
-
-function showSuccessTick(msg) {
-  const overlay = document.getElementById("successOverlay");
-  const msgEl = document.getElementById("successMsg");
-  msgEl.textContent = msg;
-  overlay.classList.add("active");
-
-  const svg = overlay.querySelector(".tick-svg");
-  const newSvg = svg.cloneNode(true);
-  svg.parentNode.replaceChild(newSvg, svg);
-
-  setTimeout(() => {
-    overlay.classList.remove("active");
-  }, 2000);
-}
-
-/* ── Drag & Drop column handlers ──────────────────────────── */
-function handleDragOver(e) {
-  e.preventDefault();
-  e.currentTarget.classList.add("drag-over");
-  e.dataTransfer.dropEffect = "move";
-}
-
-function handleDragLeave(e) {
-  e.currentTarget.classList.remove("drag-over");
-}
-
+// ── Drag & drop ───────────────────────────────────────────────
+function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("drag-over"); e.dataTransfer.dropEffect = "move"; }
+function handleDragLeave(e) { e.currentTarget.classList.remove("drag-over"); }
 function handleDrop(e, status) {
   e.preventDefault();
   e.currentTarget.classList.remove("drag-over");
-  if (draggedTaskId !== null) {
-    moveTask(draggedTaskId, status);
-  }
+  if (draggedTaskId !== null) moveTask(null, draggedTaskId, status);
 }
 
-/* ── Modal helpers ────────────────────────────────────────── */
-function openTaskModal() {
-  editingTaskId = null;
-  document.getElementById("taskModalTitle").textContent = "Add Task";
-  document.getElementById("submitAddTask").textContent = "Add Task";
-  document.getElementById("taskTitle").value = "";
-  document.getElementById("taskDesc").value = "";
-  document.getElementById("taskStatus").value = "todo";
-  document.getElementById("addTaskModal").classList.add("active");
-  document.getElementById("taskTitle").focus();
-}
-function closeTaskModal() {
-  document.getElementById("addTaskModal").classList.remove("active");
-  editingTaskId = null;
-}
-
-/* ── Event listeners ──────────────────────────────────────── */
-document.getElementById("openAddTask").addEventListener("click", openTaskModal);
-document.getElementById("cancelAddTask").addEventListener("click", closeTaskModal);
-document.getElementById("submitAddTask").addEventListener("click", saveTask);
-
-document.getElementById("addTaskModal").addEventListener("click", e => {
-  if (e.target === document.getElementById("addTaskModal")) closeTaskModal();
-});
-
-document.getElementById("taskTitle").addEventListener("keydown", e => {
-  if (e.key === "Enter") saveTask();
-});
-
-/* ── Puller (Background Sync) ──────────────────────────────── */
-const PULL_INTERVAL = 10000; // 10 seconds for tasks
-let pullerTimer = null;
+// ── Background puller ─────────────────────────────────────────
+const PULL_MS = 15_000;   // 15 s — generous interval; DOM is cheap to diff
 
 function startPuller() {
   stopPuller();
-  pullerTimer = setInterval(() => {
-    if (!document.hidden) loadFullBoardData();
-  }, PULL_INTERVAL);
+  pullerTimer = setInterval(() => { if (!document.hidden) fetchBundle(); }, PULL_MS);
 }
-
 function stopPuller() {
-  if (pullerTimer) clearInterval(pullerTimer);
+  if (pullerTimer) { clearInterval(pullerTimer); pullerTimer = null; }
 }
 
-/* ── Init ─────────────────────────────────────────────────── */
-async function init() {
-  if (!BOARD_ID || isNaN(BOARD_ID)) { window.location.href = "/"; return; }
-  await loadFullBoardData();
-  startPuller();
+// ── Cache helpers ─────────────────────────────────────────────
+function readCache(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
 }
-
-// Restart puller when tab becomes visible
-document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-        loadFullBoardData(); // Immediate refresh
-        startPuller();
-    } else {
-        stopPuller();
-    }
-});
-
-init();
+function saveCache(key, jsonStr) {
+  try { localStorage.setItem(key, jsonStr); } catch { }
+}
+function invalidateTaskCache() {
+  localStorage.removeItem(KEY_TASKS);
+}

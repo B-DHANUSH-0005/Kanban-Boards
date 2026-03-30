@@ -2,72 +2,136 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KanFlow — Login</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        .auth-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-        }
-        .auth-title {
-            background: linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 1rem;
-        }
-        .auth-subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-            font-size: 0.9rem;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KanBoards — Login</title>
+  <meta name="description" content="Log in to your KanBoards account." />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 
 <body class="auth-page">
-    <div class="auth-container">
-        <div class="auth-card">
-            <h2 class="auth-title">Welcome Back</h2>
-            <p class="auth-subtitle">Log in to manage your Kanban boards</p>
-            
-            <div id="loginSuccess" class="success-msg" style="display: none; padding: 1rem; background: var(--sticky-green); border-radius: var(--radius-sm); margin-bottom: 1.5rem; color: var(--accent-success); font-weight: 600; text-align: center;"></div>
-            <div id="loginError" class="error-msg" style="display: none; padding: 1rem; background: #fff1f2; border-radius: var(--radius-sm); margin-bottom: 1.5rem; color: var(--accent-danger); font-weight: 600; text-align: center;"></div>
+  <div class="auth-container">
+    <div class="auth-card">
 
-            <form id="loginForm" class="auth-form">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" placeholder="Enter your username" required autocomplete="username">
-                </div>
+      <h2 class="auth-title">KanBoards</h2>
+      <p class="auth-subtitle">Sign in to your account</p>
 
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <div class="password-wrapper" style="position: relative;">
-                        <input type="password" id="password" placeholder="Enter your password" required
-                            autocomplete="current-password">
-                        <button type="button" class="toggle-password" aria-label="Toggle password visibility" style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted);">
-                            <span class="eye-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                            </span>
-                        </button>
-                    </div>
-                </div>
+      <div id="loginSuccess" class="alert alert-success" role="alert"></div>
+      <div id="loginError" class="alert alert-error" role="alert"></div>
 
-                <button type="submit" class="btn btn-primary btn-block" style="height: 3rem; font-size: 1rem;">Log In</button>
-            </form>
+      <form id="loginForm" class="auth-form" novalidate>
 
-            <p class="auth-footer">
-                Don't have an account? <a href="/register">Register now</a>
-            </p>
+        <div class="form-group">
+          <label for="email_id">Email</label>
+          <input type="email" id="email_id" name="email_id" placeholder="Enter your email" required maxlength="254"
+            autocomplete="email" />
         </div>
-    </div>
 
-    <script src="/static/auth.js"></script>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="password" name="password" placeholder="Enter password" required minlength="6"
+              autocomplete="current-password" />
+            <button type="button" class="toggle-password" aria-label="Show / hide password">
+              <span class="eye-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div style="text-align:right;margin-top:-6px">
+          <button type="button" id="forgotPasswordBtn" class="link-btn">Forgot password?</button>
+        </div>
+
+        <button type="submit" id="loginSubmit" class="btn btn-primary btn-block btn-lg">Log In</button>
+      </form>
+
+      <p class="auth-footer">
+        No account? <a href="/register">Register</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Forgot Password Modal ──────────────────────────── -->
+  <div id="forgotModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="forgotModalTitle">
+    <div class="modal forgot-modal">
+
+      <!-- Step 1: Enter email -->
+      <div id="fpStep1">
+        <h3 class="modal-title" id="forgotModalTitle">Forgot Password</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px">
+          Enter your registered email and we'll send you a 4-digit code.
+        </p>
+        <div id="fpEmailError" class="alert alert-error" role="alert"></div>
+        <div class="form-group">
+          <label for="fpEmail">Email address</label>
+          <input type="email" id="fpEmail" placeholder="you@example.com" maxlength="254" autocomplete="email" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="fpCancelBtn" class="btn btn-ghost">Cancel</button>
+          <button type="button" id="fpSendBtn" class="btn btn-primary">Send Code</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Enter code -->
+      <div id="fpStep2" style="display:none">
+        <h3 class="modal-title">Enter Code</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px">
+          A 4-digit code was sent to <strong id="fpEmailDisplay"></strong>. Enter it below.
+        </p>
+        <div id="fpCodeError" class="alert alert-error" role="alert"></div>
+        <div class="form-group">
+          <label for="fpCode">4-Digit Code</label>
+          <input type="text" id="fpCode" placeholder="e.g. 4821" maxlength="4" inputmode="numeric" pattern="[0-9]{4}"
+            autocomplete="one-time-code" />
+        </div>
+        <div class="modal-actions" style="align-items: center; justify-content: space-between;">
+          <span id="fpTimerDisplay" style="font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums;"></span>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="fpResendBtn" class="btn btn-ghost" disabled>Resend</button>
+            <button type="button" id="fpVerifyBtn" class="btn btn-primary">Verify Code</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: New password -->
+      <div id="fpStep3" style="display:none">
+        <h3 class="modal-title">Reset Password</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px">
+          Choose a new password for your account.
+        </p>
+        <div id="fpResetError" class="alert alert-error" role="alert"></div>
+        <div class="form-group">
+          <label for="fpNewPassword">New Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="fpNewPassword" placeholder="Min 6 characters" minlength="6" maxlength="72"
+              autocomplete="new-password" />
+            <button type="button" class="toggle-password" aria-label="Show / hide password">
+              <span class="eye-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="fpSaveBtn" class="btn btn-primary btn-block">Save Password</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/utils.js"></script>
+  <script src="/static/auth.js"></script>
 </body>
 
 </html>

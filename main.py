@@ -1,71 +1,85 @@
+"""
+main.py — FastAPI application entry-point.
+All config is loaded via config.py from the .env file.
+"""
 import sys
 import os
+from contextlib import asynccontextmanager
 
-# Make sure backend directory is on the path so routers can import db & models
+# Ensure the backend package is importable when running from the project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
-from typing import Optional
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
+
+from config import HOST, PORT, ALLOWED_ORIGINS
 from db import create_tables
 from routers import boards, tasks, auth
 
-app = FastAPI(title="Kanban Board API", version="1.0.0")
+# ── Lifespan (Startup/Shutdown) ─────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Ensure DB tables and indexes exist
+    create_tables()
+    yield
+    # Shutdown logic (if any) goes here
 
-# ── CORS (must be added BEFORE routers) ───────────────────────
+# ── App ───────────────────────────────────────────────────────
+app = FastAPI(
+    title="KanBoards API",
+    version="2.1.0",
+    description="Kanban board API — JWT Bearer Auth, Thread-safe, Optimized.",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    lifespan=lifespan
+)
+
+# ── CORS ──────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ── Routers ───────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(boards.router)
 app.include_router(tasks.router)
 
-# ── Static files (frontend) ───────────────────────────────────
+# ── Static files & HTML Routes ────────────────────────────────
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
-# ── Serve HTML pages ──────────────────────────────────────────
-@app.get("/")
-def serve_root(request: Request):
-    # If logged in, show boards list (index.html), else register
-    if request.cookies.get("user_id"):
-        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
-    return RedirectResponse(url="/register")
+@app.get("/", include_in_schema=False)
+def serve_root():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
-@app.get("/register")
+@app.get("/register", include_in_schema=False)
 def serve_register():
     return FileResponse(os.path.join(FRONTEND_DIR, "register.html"))
 
 
-@app.get("/login")
+@app.get("/login", include_in_schema=False)
 def serve_login():
     return FileResponse(os.path.join(FRONTEND_DIR, "login.html"))
 
 
-@app.get("/board")
-def serve_board(request: Request, id: Optional[str] = None):
-    # If no ID provided, or not logged in, go back to boards list (root)
-    if not request.cookies.get("user_id") or not id:
+@app.get("/board", include_in_schema=False)
+def serve_board(request: Request, id: str | None = None):
+    # Only redirect if no board ID is provided (cleaner UX)
+    if not id:
         return RedirectResponse(url="/")
     return FileResponse(os.path.join(FRONTEND_DIR, "board.html"))
 
 
-# ── Startup ───────────────────────────────────────────────────
-@app.on_event("startup")
-def startup():
-    create_tables()
-    print("[OK] Database tables ready")
-
-
+# ── Dev entry-point ───────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Use standard host/port from config, with reload enabled for development
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

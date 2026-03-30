@@ -1,89 +1,93 @@
-import os
+"""
+db.py — Database connection pool using psycopg2.
+All config is pulled from config.py (which reads .env).
+"""
 import psycopg2
 from psycopg2 import pool
-from dotenv import load_dotenv
 from contextlib import contextmanager
+from config import DATABASE_URL, DB_POOL_MIN, DB_POOL_MAX
 
-load_dotenv()
+# Use ThreadedConnectionPool for thread-safety with FastAPI
+_pool: pool.ThreadedConnectionPool | None = None
 
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ── Connection Pool ───────────────────────────────────────────
-# Use a connection pool to avoid the overhead of opening 
-# a new connection for every single request.
-_pool = None
-
-def get_pool():
+def _get_pool() -> pool.ThreadedConnectionPool:
+    """Lazily initialise the threaded connection pool (singleton)."""
     global _pool
     if _pool is None:
-        try:
-            # Min 1, Max 10 connections
-            _pool = pool.SimpleConnectionPool(1, 15, dsn=DATABASE_URL)
-            print("[OK] Connection Pool Initialized")
-        except Exception as e:
-            print(f"Error creating connection pool: {e}")
-            raise
+        _pool = pool.ThreadedConnectionPool(DB_POOL_MIN, DB_POOL_MAX, dsn=DATABASE_URL)
+        print("[DB] Threaded connection pool initialised")
     return _pool
 
-def get_connection():
-    """Retrieve a connection from the pool."""
-    return get_pool().getconn()
 
-def put_connection(conn):
-    """Return a connection back to the pool."""
+def get_connection() -> psycopg2.extensions.connection:
+    """Borrow a connection from the pool."""
+    return _get_pool().getconn()
+
+
+def put_connection(conn: psycopg2.extensions.connection) -> None:
+    """Return a connection to the pool."""
     if _pool and conn:
         _pool.putconn(conn)
 
+
 @contextmanager
 def db_conn():
-    """Context manager for getting/returning connections to the pool."""
+    """Context manager: borrow → yield → return connection."""
     conn = get_connection()
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         put_connection(conn)
 
 
-def create_tables():
-    """Create users, boards, and tasks tables if they don't exist."""
+def create_tables() -> None:
+    """Idempotently create tables and indexes for performance."""
     with db_conn() as conn:
         cur = conn.cursor()
-        
-        # Create users table
+
+        # Users table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                "User_id" SERIAL PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                "hashed password" TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id          SERIAL PRIMARY KEY,
+                username    TEXT UNIQUE NOT NULL,
+                password    TEXT NOT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
-        # Create boards table
+
+        # Boards table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS boards (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users("User_id"),
-                name TEXT NOT NULL,
+                id          SERIAL PRIMARY KEY,
+                user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                name        TEXT NOT NULL,
                 description TEXT,
-                owner_username TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
-        # Create tasks table
+        # Index for faster board listings by user
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id)")
+
+        # Tasks table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
-                id SERIAL PRIMARY KEY,
-                board_id INTEGER REFERENCES boards(id) ON DELETE CASCADE,
-                title TEXT NOT NULL,
+                id          SERIAL PRIMARY KEY,
+                board_id    INTEGER REFERENCES boards(id) ON DELETE CASCADE,
+                title       TEXT NOT NULL,
                 description TEXT,
-                status TEXT DEFAULT 'todo',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                status      TEXT NOT NULL DEFAULT 'todo',
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+        # Index for faster task lookups by board and status
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
+
         conn.commit()
         cur.close()
-    print("[OK] Database tables ready")
+
+    print("[DB] Tables and indexes ready")

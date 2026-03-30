@@ -1,0 +1,13 @@
+﻿python : INFO:     Will watch for changes in these directories: 
+['C:\\Users\\Dhanush\\OneDrive\\Desktop\\kanban-project']
+At line:1 char:1
++ python main.py > server_v3.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:     Will ...anban-project']:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [22584] using WatchFiles
+INFO:     Started server process [35324]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

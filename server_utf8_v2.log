@@ -1,0 +1,20 @@
+﻿python : C:\Users\Dhanush\OneDrive\Desktop\kanban-project\main.py:72: DeprecationWarning: 
+At line:1 char:1
++ python main.py > server.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\Dhanus...cationWarning: :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Will watch for changes in these directories: ['C:\\Users\\Dhanush\\OneDrive\\Desktop\\kanban-project']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [31856] using WatchFiles
+INFO:     Started server process [20436]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend\models.py'. Reloading...

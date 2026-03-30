@@ -1,0 +1,136 @@
+﻿python : INFO:     Will watch for changes in these directories: 
+['C:\\Users\\Dhanush\\OneDrive\\Desktop\\kanban-project']
+At line:1 char:1
++ python main.py > server_final.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:     Will ...anban-project']:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [32572] using WatchFiles
+INFO:     Started server process [23128]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[DB] Threaded connection pool initialised
+[DB] Tables and indexes ready
+INFO:     127.0.0.1:64223 - "POST /auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:64225 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64227 - "POST /boards HTTP/1.1" 201 Created
+INFO:     127.0.0.1:64229 - "GET /boards HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64231 - "POST /auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:64242 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64245 - "GET /boards HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50420 - "POST /auth/register HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\Dhanush\OneDrive\Desktop\kanban-project\backend\db.py", line 39, in db_conn
+    yield conn
+  File "C:\Users\Dhanush\OneDrive\Desktop\kanban-project\backend\routers\auth.py", line 23, in register
+    cur.execute(
+    ~~~~~~~~~~~^
+        "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        (user.username,),
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+psycopg2.OperationalError: could not receive data from server: Software caused connection abort (0x00002745/10053)
+SSL SYSCALL error: Software caused connection abort (0x00002745/10053)
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\httptools_impl.py", 
+line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 60, 
+in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1134, in 
+__call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 107, in 
+__call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in 
+__call__
+    raise exc
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in 
+__call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 87, in 
+__call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, 
+in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in 
+wrapped_app
+    raise exc
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in 
+wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 
+18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in 
+wrapped_app
+    raise exc
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in 
+wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 314, in 
+run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\starlette\concurrency.py", line 32, in 
+run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\anyio\to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py", line 2502, in 
+run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Dhanush\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+  File "C:\Users\Dhanush\OneDrive\Desktop\kanban-project\backend\routers\auth.py", line 20, in register
+    with db_conn() as conn:
+         ~~~~~~~^^
+  File "C:\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\Dhanush\OneDrive\Desktop\kanban-project\backend\db.py", line 41, in db_conn
+    conn.rollback()
+    ~~~~~~~~~~~~~^^
+psycopg2.InterfaceError: connection already closed
