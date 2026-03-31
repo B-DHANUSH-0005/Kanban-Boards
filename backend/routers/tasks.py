@@ -23,17 +23,19 @@ def _row_to_task(row: tuple) -> dict:
     }
 
 
-def _assert_board_ownership(cur, board_id: int, user_id: int) -> None:
-    """Verify board exists and belongs to user."""
+def _assert_board_ownership(cur, board_id: int, user_id: int) -> list[str]:
+    """Verify board exists and belongs to user. Returns list of active columns."""
     cur.execute(
-        "SELECT id FROM boards WHERE id = %s AND user_id = %s",
+        "SELECT columns FROM boards WHERE id = %s AND user_id = %s",
         (board_id, user_id),
     )
-    if not cur.fetchone():
+    row = cur.fetchone()
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Board not found or you don't have access.",
         )
+    return row[0].split(",") if row[0] else []
 
 
 def _assert_task_ownership(cur, task_id: int, user_id: int) -> tuple:
@@ -66,7 +68,13 @@ def create_task(
 ) -> dict:
     with db_conn() as conn:
         with conn.cursor() as cur:
-            _assert_board_ownership(cur, task.board_id, user_id)
+            columns = _assert_board_ownership(cur, task.board_id, user_id)
+            
+            if task.status not in columns:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Status '{task.status}' is not valid for this board. Valid: {', '.join(columns)}",
+                )
 
             cur.execute(
                 "INSERT INTO tasks (board_id, title, description, status)"
@@ -92,11 +100,9 @@ def get_tasks(
     page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     user_id: int = Depends(get_current_user_id),
 ) -> dict:
-    if filter_status and filter_status not in VALID_TASK_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Status must be one of: {', '.join(sorted(VALID_TASK_STATUSES))}",
-        )
+    # Status filter is now dynamic per board if board_id is provided,
+    # but for global list we skip validation or check against a master list.
+    # Given the app structure, task list is usually scoped to a board.
 
     offset = (page - 1) * page_size
 
@@ -172,8 +178,13 @@ def update_task(
             new_status      = task.status      if task.status      is not None else row[4]
             new_board_id    = task.board_id    if task.board_id    is not None else row[1]
 
-            if new_board_id != row[1]:
-                _assert_board_ownership(cur, new_board_id, user_id)
+            if new_board_id != row[1] or task.status is not None:
+                columns = _assert_board_ownership(cur, new_board_id, user_id)
+                if new_status not in columns:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Status '{new_status}' is not valid for this board. Valid: {', '.join(columns)}",
+                    )
 
             cur.execute(
                 "UPDATE tasks SET title = %s, description = %s, status = %s, board_id = %s"

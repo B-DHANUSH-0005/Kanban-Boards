@@ -285,7 +285,25 @@ abbr[title] {
 .board-title-text {
   font-size: 22px;
   font-weight: 700;
+}
+
+.board-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 2px;
+}
+
+.btn-edit-board {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+}
+
+.board-header:hover .btn-edit-board {
+  opacity: 1;
 }
 
 /* ── Board Grid (boards list page) ────────────────────────── */
@@ -351,22 +369,45 @@ abbr[title] {
 }
 
 /* ── Kanban Columns ────────────────────────────────────────── */
+.columns-outer-wrapper {
+  display: flex;
+  height: calc(100vh - 160px);
+  overflow-x: auto;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.columns-outer-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.columns-outer-wrapper::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+
+.columns-outer-wrapper::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
 .columns-wrapper {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 16px;
   align-items: start;
-  height: calc(100vh - 160px);
+  height: 100%;
 }
 
 .column {
   background: var(--bg-card);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--border-strong);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
+  width: 320px;
   height: 100%;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .column-header {
@@ -422,6 +463,66 @@ abbr[title] {
 }
 
 /* Column border accent — top only, monochrome shades */
+/* Column header menu */
+.column-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-column-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-column-delete:hover {
+  color: #cc0000;
+  background: #fff5f5;
+}
+
+.btn-column-edit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 13px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-column-edit:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Inline rename input inside column header */
+.col-rename-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-strong);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  outline: none;
+  width: 100px;
+  padding: 0 2px;
+  line-height: 1.4;
+}
+
 .col-todo {
   border-top: 2px solid #aaaaaa;
 }
@@ -492,6 +593,38 @@ abbr[title] {
   border-style: solid;
 }
 
+/* ── Add Column Button ─────────────────────────────────────── */
+.add-column-wrapper {
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.btn-add-column {
+  width: 120px;
+  height: 100%;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur) var(--ease);
+  color: var(--text-muted);
+}
+
+.btn-add-column:hover {
+  background: var(--bg-hover);
+  border-style: solid;
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.plus-icon {
+  font-size: 24px;
+  font-weight: 700;
+}
+
 /* ── Task Cards ────────────────────────────────────────────── */
 .task-card {
   background: var(--bg-card);
@@ -533,6 +666,7 @@ abbr[title] {
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;

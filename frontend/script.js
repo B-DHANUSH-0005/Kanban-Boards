@@ -238,9 +238,18 @@ async function saveBoard() {
       return;
     }
 
+    const savedBoard = await res.json();
     closeModal();
     showToast(isEdit ? "Board updated" : "Board created");
-    loadBoards();
+    
+    if (!isEdit) {
+      // Redirect to the new board immediately
+      setTimeout(() => {
+        window.location.href = `/board?id=${savedBoard.id}`;
+      }, 500);
+    } else {
+      loadBoards();
+    }
 
   } catch {
     showToast("Network error", true);

@@ -28,61 +28,28 @@
 
     <!-- Board header -->
     <div class="board-header">
-      <div>
-        <h1 class="board-title-text" id="boardTitle">Loading…</h1>
+      <div class="board-header-content">
+        <div class="board-title-wrapper">
+          <h1 class="board-title-text" id="boardTitle">Loading…</h1>
+          <button class="btn-icon btn-edit-board" id="openEditBoard" title="Edit Board Info">&#x270E;</button>
+        </div>
         <p class="page-subtitle" id="boardDesc"></p>
       </div>
       <!-- No global Add Task button — each column has its own -->
     </div>
 
     <!-- Columns -->
-    <div class="columns-wrapper">
-
-      <!-- Todo -->
-      <div class="column col-todo" id="col-todo" data-status="todo" ondragover="handleDragOver(event)"
-        ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,'todo')">
-        <div class="column-header">
-          <span class="column-label"><span class="dot dot-todo"></span>Todo</span>
-          <span class="task-count" id="count-todo">0</span>
-        </div>
-        <div class="tasks-list" id="tasks-todo"></div>
-        <div class="column-footer">
-          <button class="btn-add-task" onclick="openTaskModal('todo')" id="add-todo">
-            + Add task
-          </button>
-        </div>
+    <div class="columns-outer-wrapper">
+      <div id="columnsContainer" class="columns-wrapper">
+        <!-- Columns rendered via JS -->
       </div>
-
-      <!-- Doing -->
-      <div class="column col-doing" id="col-doing" data-status="doing" ondragover="handleDragOver(event)"
-        ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,'doing')">
-        <div class="column-header">
-          <span class="column-label"><span class="dot dot-doing"></span>Doing</span>
-          <span class="task-count" id="count-doing">0</span>
-        </div>
-        <div class="tasks-list" id="tasks-doing"></div>
-        <div class="column-footer">
-          <button class="btn-add-task" onclick="openTaskModal('doing')" id="add-doing">
-            + Add task
-          </button>
-        </div>
+      
+      <!-- Add Column Button -->
+      <div class="add-column-wrapper">
+        <button class="btn-add-column" id="addColumnBtn" title="Add Column">
+          <span class="plus-icon">+</span>
+        </button>
       </div>
-
-      <!-- Done -->
-      <div class="column col-done" id="col-done" data-status="done" ondragover="handleDragOver(event)"
-        ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,'done')">
-        <div class="column-header">
-          <span class="column-label"><span class="dot dot-done"></span>Done</span>
-          <span class="task-count" id="count-done">0</span>
-        </div>
-        <div class="tasks-list" id="tasks-done"></div>
-        <div class="column-footer">
-          <button class="btn-add-task" onclick="openTaskModal('done')" id="add-done">
-            + Add task
-          </button>
-        </div>
-      </div>
-
     </div>
   </main>
 
@@ -143,6 +110,28 @@
       </svg>
     </div>
     <p class="success-msg" id="successMsg">Done</p>
+  </div>
+
+  <!-- EDIT BOARD MODAL -->
+  <div class="modal-backdrop" id="editBoardModal" role="dialog" aria-modal="true" aria-labelledby="boardModalTitle">
+    <div class="modal">
+      <h2 class="modal-title" id="boardModalTitle">Edit Board</h2>
+      <div class="form-group">
+        <label for="boardNameInput">Board Name <span style="color:#cc0000">*</span></label>
+        <input type="text" id="boardNameInput" placeholder="Enter board name" maxlength="80" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label for="boardDescInput">Description
+          <span
+            style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--text-muted)">(optional)</span>
+        </label>
+        <textarea id="boardDescInput" rows="2" placeholder="What is this board for?" maxlength="500"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelEditBoard">Cancel</button>
+        <button class="btn btn-primary" id="submitEditBoard">Save Changes</button>
+      </div>
+    </div>
   </div>
 
   <script src="/static/utils.js"></script>

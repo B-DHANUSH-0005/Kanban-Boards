@@ -22,14 +22,18 @@ def _row_to_board(row: tuple) -> dict:
     """Standardized conversion from DB row to board dict."""
     return {
         "id": row[0], "name": row[1],
-        "description": row[2], "created_at": row[3],
+        "description": row[2],
+        "columns": row[3].split(",") if row[3] else [],
+        "deleted_columns": row[4].split(",") if row[4] else [],
+        "created_at": row[5],
     }
 
 
 def _assert_board_exists(cur, board_id: int, user_id: int) -> tuple:
     """Raise 404 if board not found or not owned by user. Returns the row."""
     cur.execute(
-        "SELECT id, name, description, created_at FROM boards WHERE id = %s AND user_id = %s",
+        "SELECT id, name, description, columns, deleted_columns, created_at"
+        " FROM boards WHERE id = %s AND user_id = %s",
         (board_id, user_id),
     )
     row = cur.fetchone()
@@ -57,7 +61,7 @@ def create_board(
             cur.execute(
                 "INSERT INTO boards (name, description, user_id)"
                 " VALUES (%s, %s, %s)"
-                " RETURNING id, name, description, created_at",
+                " RETURNING id, name, description, columns, deleted_columns, created_at",
                 (board.name, board.description, user_id),
             )
             row = cur.fetchone()
@@ -90,7 +94,7 @@ def get_boards(
                 )
                 total = cur.fetchone()[0]
                 cur.execute(
-                    "SELECT id, name, description, created_at"
+                    "SELECT id, name, description, columns, deleted_columns, created_at"
                     " FROM boards WHERE user_id = %s AND name ILIKE %s"
                     " ORDER BY created_at DESC LIMIT %s OFFSET %s",
                     (user_id, like, page_size, offset),
@@ -99,7 +103,7 @@ def get_boards(
                 cur.execute("SELECT COUNT(*) FROM boards WHERE user_id = %s", (user_id,))
                 total = cur.fetchone()[0]
                 cur.execute(
-                    "SELECT id, name, description, created_at"
+                    "SELECT id, name, description, columns, deleted_columns, created_at"
                     " FROM boards WHERE user_id = %s"
                     " ORDER BY created_at DESC LIMIT %s OFFSET %s",
                     (user_id, page_size, offset),
@@ -149,11 +153,15 @@ def update_board(
 
             new_name = board.name if board.name is not None else row[1]
             new_desc = board.description if board.description is not None else row[2]
+            
+            # Dynamic columns update
+            new_cols = ",".join(board.columns) if board.columns is not None else row[3]
+            new_deleted = ",".join(board.deleted_columns) if board.deleted_columns is not None else row[4]
 
             cur.execute(
-                "UPDATE boards SET name = %s, description = %s WHERE id = %s"
-                " RETURNING id, name, description, created_at",
-                (new_name, new_desc, board_id),
+                "UPDATE boards SET name = %s, description = %s, columns = %s, deleted_columns = %s WHERE id = %s"
+                " RETURNING id, name, description, columns, deleted_columns, created_at",
+                (new_name, new_desc, new_cols, new_deleted, board_id),
             )
             updated = cur.fetchone()
             conn.commit()

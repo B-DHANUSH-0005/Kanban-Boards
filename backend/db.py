@@ -62,13 +62,23 @@ def create_tables() -> None:
         # Boards table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS boards (
-                id          SERIAL PRIMARY KEY,
-                user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                name        TEXT NOT NULL,
-                description TEXT,
-                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id              SERIAL PRIMARY KEY,
+                user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                name            TEXT NOT NULL,
+                description     TEXT,
+                columns         TEXT NOT NULL DEFAULT 'todo,doing,done',
+                deleted_columns TEXT NOT NULL DEFAULT '',
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # Migration: Ensure existing boards have the columns and deleted_columns fields if they were created before
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'boards'")
+        cols = [r[0] for r in cur.fetchall()]
+        if "columns" not in cols:
+            cur.execute("ALTER TABLE boards ADD COLUMN columns TEXT NOT NULL DEFAULT 'todo,doing,done'")
+        if "deleted_columns" not in cols:
+            cur.execute("ALTER TABLE boards ADD COLUMN deleted_columns TEXT NOT NULL DEFAULT ''")
         # Index for faster board listings by user
         cur.execute("CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id)")
 

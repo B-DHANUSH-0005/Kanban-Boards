@@ -65,6 +65,8 @@ class BoardCreate(BaseModel):
 class BoardUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=BOARD_NAME_MAX_LEN)
     description: Optional[str] = Field(default=None, max_length=BOARD_DESC_MAX_LEN)
+    columns: Optional[list[str]] = None
+    deleted_columns: Optional[list[str]] = None
 
     @field_validator("name")
     @classmethod
@@ -88,6 +90,8 @@ class BoardResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
+    columns: list[str] = Field(default_factory=lambda: ["todo", "doing", "done"])
+    deleted_columns: list[str] = Field(default_factory=list)
     created_at: Optional[datetime] = None
 
 
@@ -117,10 +121,8 @@ class TaskCreate(BaseModel):
     @field_validator("status")
     @classmethod
     def validate_status(cls, v: Optional[str]) -> str:
-        v = (v or "todo").lower().strip()
-        if v not in VALID_TASK_STATUSES:
-            raise ValueError(f"Status must be one of: {', '.join(sorted(VALID_TASK_STATUSES))}")
-        return v
+        # Relaxed for dynamic columns; router will verify against board columns
+        return (v or "todo").lower().strip()
 
 
 class TaskUpdate(BaseModel):
@@ -141,10 +143,8 @@ class TaskUpdate(BaseModel):
     def validate_status(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        v = v.lower().strip()
-        if v not in VALID_TASK_STATUSES:
-            raise ValueError(f"Status must be one of: {', '.join(sorted(VALID_TASK_STATUSES))}")
-        return v
+        # Relaxed for dynamic columns; router will verify against board columns
+        return v.lower().strip()
 
 
 class TaskMove(BaseModel):
@@ -153,10 +153,8 @@ class TaskMove(BaseModel):
     @field_validator("status")
     @classmethod
     def validate_status(cls, v: str) -> str:
-        v = v.lower().strip()
-        if v not in VALID_TASK_STATUSES:
-            raise ValueError(f"Status must be one of: {', '.join(sorted(VALID_TASK_STATUSES))}")
-        return v
+        # Relaxed for dynamic columns; router will verify against board columns
+        return v.lower().strip()
 
 
 class TaskResponse(BaseModel):
