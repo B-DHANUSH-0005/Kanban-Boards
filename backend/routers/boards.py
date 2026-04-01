@@ -205,17 +205,37 @@ def merge_board(
         with conn.cursor() as cur:
             # Efficiently verify both boards exist for this user in one query
             cur.execute(
-                "SELECT id FROM boards WHERE id = ANY(%s) AND user_id = %s",
+                "SELECT id, columns FROM boards WHERE id = ANY(%s) AND user_id = %s",
                 ([board_id, merge.target_board_id], user_id),
             )
-            if len(cur.fetchall()) < 2:
+            rows = cur.fetchall()
+            if len(rows) < 2:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="One or both boards not found or you don't have access.",
                 )
 
+            source_cols = ""
+            target_cols = ""
+            for r in rows:
+                if r[0] == board_id:
+                    source_cols = r[1] or ""
+                else:
+                    target_cols = r[1] or ""
+
+            s_cols = source_cols.split(",") if source_cols else []
+            t_cols = target_cols.split(",") if target_cols else []
+            
+            merged_cols = list(t_cols)
+            for col in s_cols:
+                if col not in merged_cols:
+                    merged_cols.append(col)
+                    
+            merged_cols_str = ",".join(merged_cols)
+
             # Atomic move and delete
             cur.execute("UPDATE tasks SET board_id = %s WHERE board_id = %s", (merge.target_board_id, board_id))
+            cur.execute("UPDATE boards SET columns = %s WHERE id = %s", (merged_cols_str, merge.target_board_id))
             cur.execute("DELETE FROM boards WHERE id = %s", (board_id,))
             conn.commit()
 

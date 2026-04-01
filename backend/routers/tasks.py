@@ -180,7 +180,11 @@ def update_task(
 
             if new_board_id != row[1] or task.status is not None:
                 columns = _assert_board_ownership(cur, new_board_id, user_id)
-                if new_status not in columns:
+                if new_board_id != row[1]:
+                    # Always force incoming tasks to the 'todo' column specifically
+                    new_status = "todo"
+                    # If the target board happens to not have 'todo', it will just insert with 'todo' and appear as unmapped or force creating the status (Kanban standard)
+                elif new_status not in columns:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Status '{new_status}' is not valid for this board. Valid: {', '.join(columns)}",

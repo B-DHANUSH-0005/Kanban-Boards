@@ -81,10 +81,10 @@ function paintFromCache() {
   const tasks = readCache(KEY_TASKS);
   const boards = readCache(KEY_BOARDS);
 
+  if (boards) allBoards = boards;
   if (board) renderBoardInfo(board);
   if (tasks) renderTasks(tasks);
   else showColumnSkeletons();
-  if (boards) allBoards = boards;
 }
 
 // ── Fetch bundle from server ──────────────────────────────────
@@ -99,14 +99,17 @@ async function fetchBundle() {
 
     const data = await res.json();
 
-    // Only re-render if data actually changed (avoids flicker)
-    const boardStr = JSON.stringify(data.board);
-    const tasksStr = JSON.stringify(data.tasks);
-    const boardsStr = JSON.stringify(data.all_boards);
+    let needsTaskReRender = false;
 
+    if (boardsStr !== localStorage.getItem(KEY_BOARDS)) { saveCache(KEY_BOARDS, boardsStr); allBoards = data.all_boards; needsTaskReRender = true; }
     if (boardStr !== localStorage.getItem(KEY_BOARD)) { saveCache(KEY_BOARD, boardStr); renderBoardInfo(data.board); }
-    if (tasksStr !== localStorage.getItem(KEY_TASKS)) { saveCache(KEY_TASKS, tasksStr); renderTasks(data.tasks); }
-    if (boardsStr !== localStorage.getItem(KEY_BOARDS)) { saveCache(KEY_BOARDS, boardsStr); allBoards = data.all_boards; }
+    
+    if (tasksStr !== localStorage.getItem(KEY_TASKS)) { 
+      saveCache(KEY_TASKS, tasksStr); 
+      renderTasks(data.tasks); 
+    } else if (needsTaskReRender) {
+      renderTasks(data.tasks);
+    }
 
   } catch (err) {
     console.warn("[board] fetchBundle error:", err);
@@ -225,9 +228,9 @@ function buildTaskCard(task) {
     <div class="task-card-footer">
       <div class="task-menu-container">
         <button class="menu-dots-btn" onclick="toggleTaskMenu(event,'${task.id}')" aria-label="Task options">&#x22EE;</button>
-        <div class="dropdown-menu" id="menu-${task.id}">
+        <div class="dropdown-menu" id="menu-${task.id}" onclick="event.stopPropagation()">
           <div class="menu-item" onclick="openEditTask('${task.id}')">Edit <span>&#x270E;</span></div>
-          <div class="submenu-container">
+          <div class="submenu-container" onclick="this.classList.toggle('open')">
             <div class="menu-item">Move to <span>&#x203A;</span></div>
             <div class="submenu">
               ${STATUSES.filter((s) => s !== task.status).map((s) =>
@@ -235,7 +238,7 @@ function buildTaskCard(task) {
   ).join("")}
             </div>
           </div>
-          <div class="submenu-container">
+          <div class="submenu-container" onclick="this.classList.toggle('open')">
             <div class="menu-item">Transfer <span>&#x203A;</span></div>
             <div class="submenu">${boardItems}</div>
           </div>
@@ -546,7 +549,7 @@ async function moveTaskToBoard(e, taskId, newBoardId) {
   e?.stopPropagation();
   closeAllMenus();
 
-  const confirmed = await confirmAction("Move task?", "Move this task to another board?", "Move");
+  const confirmed = await confirmAction("Transfer task?", "Transfer this task to another board?", "Transfer");
   if (!confirmed) return;
 
   // Optimistic remove from current board
@@ -601,6 +604,7 @@ function closeAllMenus() {
       const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
       card?.querySelector(".task-menu-container")?.appendChild(menu);
     }
+    menu.querySelectorAll(".submenu-container.open").forEach(sc => sc.classList.remove("open"));
     menu.classList.remove("active");
     menu.style.cssText = "";
   });

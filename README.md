@@ -1,10 +1,10 @@
-# 🗂️ Kanban Boards — Kanban Board App
+# Kanban Boards — Kanban Board App
 
 A full-stack Kanban board web application built with **FastAPI**, **Neon PostgreSQL**, and vanilla **HTML/CSS/JS**.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 kanban-project/
@@ -27,7 +27,7 @@ kanban-project/
 
 ---
 
-## 🚀 Setup
+##  Setup
 
 ### 1. Configure Neon DB
 Edit `.env` and replace with your actual Neon connection string:
@@ -54,7 +54,7 @@ http://localhost:8000
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### Boards
 | Method | Endpoint | Description |
@@ -77,7 +77,7 @@ http://localhost:8000
 
 ---
 
-## 🧪 Postman Testing
+## Postman Testing
 
 Start server, then import these requests:
 
@@ -107,7 +107,7 @@ Body: { "status": "done" }
 
 ---
 
-## ✨ Features
+## Features
 
 - Create, view, delete boards
 - Create, move, delete tasks across 3 columns (Todo / Doing / Done)

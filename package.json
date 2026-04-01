@@ -1,0 +1,21 @@
+{
+  "name": "kanban-project",
+  "version": "1.0.0",
+  "description": "A full-stack Kanban board web application built with **FastAPI**, **Neon PostgreSQL**, and vanilla **HTML/CSS/JS**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/B-DHANUSH-0005/Kanban-Boards.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/B-DHANUSH-0005/Kanban-Boards/issues"
+  },
+  "homepage": "https://github.com/B-DHANUSH-0005/Kanban-Boards#readme"
+}

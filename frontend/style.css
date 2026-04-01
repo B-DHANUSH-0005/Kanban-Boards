@@ -285,6 +285,8 @@ abbr[title] {
 .board-title-text {
   font-size: 22px;
   font-weight: 700;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .board-title-wrapper {
@@ -375,6 +377,7 @@ abbr[title] {
   overflow-x: auto;
   gap: 16px;
   padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .columns-outer-wrapper::-webkit-scrollbar {
@@ -637,6 +640,8 @@ abbr[title] {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .task-card:hover {
@@ -658,6 +663,7 @@ abbr[title] {
   color: var(--text-primary);
   line-height: 1.4;
   word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .task-card-desc {
@@ -670,6 +676,7 @@ abbr[title] {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .task-card-footer {
@@ -778,7 +785,13 @@ abbr[title] {
   z-index: 10000;
 }
 
-.submenu-container:hover .submenu {
+@media (hover: hover) {
+  .submenu-container:hover .submenu {
+    display: flex;
+  }
+}
+
+.submenu-container.open .submenu {
   display: flex;
 }
 
@@ -1344,17 +1357,9 @@ abbr[title] {
 }
 
 /* ── Responsive ────────────────────────────────────────────── */
+
+/* ── Tablet (≤ 900px) ──────────────────────────────────────── */
 @media (max-width: 900px) {
-  .columns-wrapper {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-
-  .column {
-    height: auto;
-    min-height: 240px;
-  }
-
   .container {
     padding: 16px;
   }
@@ -1362,19 +1367,357 @@ abbr[title] {
   .topbar {
     padding: 0 16px;
   }
+
+  .boards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
 }
 
+/* ── Mobile (≤ 600px) — iPhone 16 primary target ─────────── */
 @media (max-width: 600px) {
+
+  /* === Topbar === */
+  .topbar {
+    height: 52px;
+    padding: 0 14px;
+    gap: 8px;
+  }
+
+  .logo h1 {
+    font-size: 13px;
+  }
+
+  .user-display {
+    display: none;
+    /* hide email on small screens */
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar-actions .btn {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  /* === Container === */
+  .container {
+    padding: 14px 12px;
+  }
+
+  /* === Page Header === */
   .page-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
   }
 
+  .page-title {
+    font-size: 18px;
+  }
+
+  .search-input {
+    width: 100%;
+    min-width: unset;
+    height: 38px;
+    font-size: 14px;
+  }
+
+  /* === Board Grid — single column === */
+  .boards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .board-card {
+    padding: 16px;
+  }
+
+  .board-name {
+    font-size: 15px;
+  }
+
+  /* === Board page header === */
+  .board-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+
+  .board-title-text {
+    font-size: 18px;
+  }
+
+  .btn-edit-board {
+    opacity: 1;
+    /* always visible on touch */
+  }
+
+  /* === Kanban columns — vertically stacked === */
+  .columns-outer-wrapper {
+    height: auto;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 24px;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    -webkit-overflow-scrolling: auto;
+    scroll-snap-type: none;
+  }
+
+  .columns-outer-wrapper::-webkit-scrollbar {
+    display: auto;
+  }
+
+  .columns-outer-wrapper::after {
+    display: none;
+  }
+
+  .columns-wrapper {
+    display: contents;
+  }
+
+  .column {
+    /* Full width columns taking natural height */
+    width: 100%;
+    min-width: unset;
+    max-width: none;
+    height: auto;
+    overflow: visible;
+    scroll-snap-align: none;
+    flex-shrink: 0;
+  }
+
+  .add-column-wrapper {
+    width: 100%;
+    margin-right: 0;
+    height: 60px;
+  }
+
+  .btn-add-column {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* === Column header — bigger touch targets === */
+  .column-header {
+    padding: 12px 14px 10px;
+  }
+
+  .column-label {
+    font-size: 11px;
+  }
+
+  .btn-column-delete,
+  .btn-column-edit {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
+  /* === Task list === */
+  .tasks-list {
+    flex: none;
+    height: auto;
+    overflow-y: visible;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  /* === Task cards — bigger touch area === */
+  .task-card {
+    padding: 10px 12px;
+  }
+
+  .task-card-title {
+    font-size: 14px;
+  }
+
+  .task-card-desc {
+    font-size: 13px;
+  }
+
+  /* Make kebab menu button finger-friendly */
+  .menu-dots-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  /* === Dropdown menus — wider on mobile === */
+  .dropdown-menu {
+    width: 200px;
+    right: 0;
+    left: auto;
+  }
+
+  /* Submenus appear as centralized full screen modals on mobile */
+  .submenu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-height: 80vh;
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    z-index: 10001;
+    padding: 8px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.4);
+    overflow-y: auto;
+  }
+
+  /* No extra hover fix needed here, already handled globally */
+  .submenu-container.open .submenu {
+    display: flex;
+  }
+
+  /* Mobile modal adjustments (retained base centering, just adjusted margins/padding) */
   .modal {
-    padding: 22px 18px 18px;
+    padding: 24px 20px;
+  }
+
+  .modal-title {
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
+
+  .modal-actions {
+    margin-top: 18px;
+    gap: 10px;
+  }
+
+  .modal-actions .btn {
+    flex: 1;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  /* === Forms in modals === */
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    font-size: 16px;
+    /* prevents iOS zoom on focus */
+    padding: 10px 12px;
+  }
+
+  /* === Confirm dialog === */
+  .dialog-box {
+    padding: 24px 20px;
+  }
+
+  .dialog-actions {
+    gap: 10px;
+  }
+
+  .dialog-actions .btn {
+    flex: 1;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  /* === Auth pages === */
+  .auth-container {
+    padding: 16px 12px;
   }
 
   .auth-card {
-    padding: 28px 20px;
+    padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg);
+  }
+
+  .auth-title {
+    font-size: 20px;
+  }
+
+  .auth-form .btn-lg {
+    height: 48px;
+    font-size: 15px;
+  }
+
+  /* === Toast — avoid home bar on iOS === */
+  .toast {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    right: 12px;
+    left: 12px;
+    max-width: unset;
+    text-align: center;
+    font-size: 13px;
+  }
+
+
+
+  /* === Pagination — bigger taps === */
+  .page-btn {
+    min-width: 38px;
+    height: 38px;
+    font-size: 14px;
+  }
+
+  /* === Buttons globally — minimum 44px touch target === */
+  .btn {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  .btn-lg {
+    min-height: 48px;
+  }
+}
+
+/* ── Very small screens (≤ 375px — iPhone SE) ─────────────── */
+@media (max-width: 375px) {
+
+  .topbar-actions .btn span,
+  .topbar-actions .btn {
+    font-size: 11px;
+    padding: 0 8px;
+  }
+
+  .column {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .auth-card {
+    padding: 22px 16px;
+  }
+}
+
+/* ── Slide-up animation for bottom sheets ──────────────────── */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Safe area for notch / Dynamic Island ──────────────────── */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+    height: calc(56px + env(safe-area-inset-top));
+  }
+
+  @media (max-width: 600px) {
+    .topbar {
+      height: calc(52px + env(safe-area-inset-top));
+    }
   }
 }

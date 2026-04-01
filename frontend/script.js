@@ -148,11 +148,10 @@ function renderGridSkeleton() {
     </div>`).join("");
 }
 
-// ── Build board card HTML ─────────────────────────────────────
 function buildBoardCard(b) {
   const mergeItems = allBoardsData
     .filter((o) => o.id !== b.id)
-    .map((o) => `<div class="menu-item" onclick="mergeBoard(event,'${b.id}','${o.id}','${escHtml(o.name)}')">${escHtml(o.name)}</div>`)
+    .map((o) => `<div class="menu-item" onclick="mergeBoard(event,'${b.id}','${o.id}','${escHtml(o.name).replace(/'/g, "\\'")}')">${escHtml(o.name)}</div>`)
     .join("") || `<div class="menu-item" style="opacity:.5;cursor:default">No other boards</div>`;
 
   return `
@@ -163,9 +162,9 @@ function buildBoardCard(b) {
         <div></div>
         <div class="task-menu-container">
           <button class="menu-dots-btn" onclick="toggleBoardMenu(event,'${b.id}')" aria-label="Board options">&#x22EE;</button>
-          <div class="dropdown-menu" id="menu-${b.id}">
+          <div class="dropdown-menu" id="menu-${b.id}" onclick="event.stopPropagation()">
             <div class="menu-item" onclick="editBoard(event,'${b.id}')">Edit <span>&#x270E;</span></div>
-            <div class="submenu-container">
+            <div class="submenu-container" onclick="this.classList.toggle('open')">
               <div class="menu-item">Merge into <span>&#x203A;</span></div>
               <div class="submenu">${mergeItems}</div>
             </div>
@@ -302,17 +301,19 @@ async function deleteBoard(e, id) {
   }
 }
 
-// ── Merge board ───────────────────────────────────────────────
 async function mergeBoard(e, sourceId, targetId, targetName) {
   e.stopPropagation();
   closeAllBoardMenus();
 
   const confirmed = await confirmAction(
     "Merge boards?",
-    `All tasks will move to "${targetName}". The current board will be deleted.`,
+    `All tasks and columns will move to "${targetName}". The current board will be deleted.`,
     "Merge"
   );
   if (!confirmed) return;
+
+  const sourceCard = document.getElementById(`board-${sourceId}`);
+  if (sourceCard) sourceCard.style.display = 'none';
 
   try {
     const res = await apiFetch(`/boards/${sourceId}/merge`, {
@@ -320,9 +321,19 @@ async function mergeBoard(e, sourceId, targetId, targetName) {
       body:   JSON.stringify({ target_board_id: Number(targetId) }),
     });
     if (!res || !res.ok) throw new Error("Merge failed");
+
+    // Invalidate target board cache so new tasks paint instantly next load
+    localStorage.removeItem(`kb_tasks_${targetId}`);
+    localStorage.removeItem(`kb_board_${targetId}`);
+    sessionStorage.removeItem(`pfetch_${targetId}`);
+
+    // Eagerly prefetch the updated board bundle into cache for instant navigation later
+    prefetchBoard(targetId);
+
     showSuccessTick("Merged");
     loadBoards();
   } catch (err) {
+    if (sourceCard) sourceCard.style.display = '';
     showToast(err.message, true);
   }
 }
@@ -331,14 +342,44 @@ async function mergeBoard(e, sourceId, targetId, targetName) {
 function toggleBoardMenu(e, boardId) {
   e.stopPropagation();
   const menu   = document.getElementById(`menu-${boardId}`);
+  const btn    = e.currentTarget;
   const isOpen = menu.classList.contains("active");
+  
   closeAllBoardMenus();
-  if (!isOpen) menu.classList.add("active");
+  
+  if (!isOpen) {
+    document.body.appendChild(menu);
+    menu.classList.add("active");
+    menu.dataset.boardId = boardId;
+    positionMenu(menu, btn);
+  }
+}
+
+function positionMenu(menu, btn) {
+  const rect = btn.getBoundingClientRect();
+  const menuW = 186;
+  let left = rect.right - menuW;
+  if (left < 8) left = 8;
+
+  menu.style.cssText =
+    `position:fixed;top:${rect.bottom + 4}px;left:${left}px;right:auto;z-index:9999`;
 }
 
 function closeAllBoardMenus() {
-  document.querySelectorAll(".board-card .dropdown-menu").forEach((m) => m.classList.remove("active"));
+  document.querySelectorAll(".dropdown-menu.active").forEach((menu) => {
+    const boardId = menu.dataset.boardId;
+    if (boardId) {
+      const card = document.getElementById(`board-${boardId}`);
+      card?.querySelector(".task-menu-container")?.appendChild(menu);
+    }
+    menu.classList.remove("active");
+    menu.querySelectorAll(".submenu-container.open").forEach(sc => sc.classList.remove("open"));
+    menu.style.cssText = "";
+  });
 }
+
+window.addEventListener("click", closeAllBoardMenus);
+window.addEventListener("scroll", () => { if (document.querySelector(".dropdown-menu.active")) closeAllBoardMenus(); }, true);
 
 // ── Modal helpers ─────────────────────────────────────────────
 function openModal() {
