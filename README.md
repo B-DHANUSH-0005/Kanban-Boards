@@ -41,16 +41,25 @@ cd kanban-project
 pip install -r requirements.txt
 ```
 
-### 3. Run the server
+### 3. Build the React UI
+```bash
+cd frontend-react
+npm install
+npm run build
+```
+
+### 4. Run the server
 ```bash
 cd backend
 uvicorn main:app --reload --port 8000
 ```
 
-### 4. Open in browser
+### 5. Open in browser
 ```
 http://localhost:8000
 ```
+
+> The FastAPI backend now serves whatever is in `frontend-react/dist`. Re-run `npm run build` anytime the React sources change, or run the `npm run dev` Vite server separately if you prefer hot reloading (the Vite proxy is already set up to forward `/auth`, `/boards`, and `/tasks` to FastAPI).
 
 ---
 

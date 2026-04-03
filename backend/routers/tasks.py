@@ -181,9 +181,14 @@ def update_task(
             if new_board_id != row[1] or task.status is not None:
                 columns = _assert_board_ownership(cur, new_board_id, user_id)
                 if new_board_id != row[1]:
-                    # Always force incoming tasks to the 'todo' column specifically
-                    new_status = "todo"
-                    # If the target board happens to not have 'todo', it will just insert with 'todo' and appear as unmapped or force creating the status (Kanban standard)
+                    # On board transfer, place the task into the target's default column
+                    default_status = "todo" if "todo" in columns else (columns[0] if columns else None)
+                    if default_status is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Target board has no columns configured.",
+                        )
+                    new_status = default_status
                 elif new_status not in columns:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -234,7 +239,13 @@ def move_task(
 ) -> dict:
     with db_conn() as conn:
         with conn.cursor() as cur:
-            _assert_task_ownership(cur, task_id, user_id)
+            task_row = _assert_task_ownership(cur, task_id, user_id)
+            columns = _assert_board_ownership(cur, task_row[1], user_id)
+            if move.status not in columns:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Status '{move.status}' is not valid for this board. Valid: {', '.join(columns)}",
+                )
 
             cur.execute(
                 "UPDATE tasks SET status = %s WHERE id = %s"

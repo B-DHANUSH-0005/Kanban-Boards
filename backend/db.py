@@ -49,15 +49,28 @@ def create_tables() -> None:
     with db_conn() as conn:
         cur = conn.cursor()
 
-        # Users table
+        # Users table (email_id is the canonical login identifier)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id          SERIAL PRIMARY KEY,
-                username    TEXT UNIQUE NOT NULL,
+                email_id    TEXT UNIQUE NOT NULL,
                 password    TEXT NOT NULL,
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Migration: add email_id if the table was created with `username`
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        user_cols = [r[0] for r in cur.fetchall()]
+        if "email_id" not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN email_id TEXT UNIQUE")
+            # Backfill from legacy username column when present
+            if "username" in user_cols:
+                cur.execute("UPDATE users SET email_id = username WHERE email_id IS NULL")
+            # Enforce NOT NULL after backfill
+            cur.execute("ALTER TABLE users ALTER COLUMN email_id SET NOT NULL")
+        # Ensure a unique index exists even if the column was added later
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_id ON users(email_id)")
 
         # Boards table
         cur.execute("""

@@ -216,9 +216,19 @@ def reset_password(body: ResetPasswordRequest) -> dict:
             detail="Invalid or expired code.",
         )
 
-    hashed = hash_password(body.new_password)
     with db_conn() as conn:
         with conn.cursor() as cur:
+            # Check if the new password is the same as the old password
+            cur.execute("SELECT password FROM users WHERE LOWER(email_id) = %s", (email,))
+            row = cur.fetchone()
+            
+            if row and verify_password(body.new_password, row[0]):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="New password cannot be the same as the previous password."
+                )
+
+            hashed = hash_password(body.new_password)
             cur.execute(
                 "UPDATE users SET password = %s WHERE LOWER(email_id) = %s",
                 (hashed, email),

@@ -153,10 +153,22 @@ def update_board(
 
             new_name = board.name if board.name is not None else row[1]
             new_desc = board.description if board.description is not None else row[2]
-            
+
             # Dynamic columns update
-            new_cols = ",".join(board.columns) if board.columns is not None else row[3]
+            current_cols = row[3].split(",") if row[3] else []
+            incoming_cols = board.columns if board.columns is not None else current_cols
+            new_cols = ",".join(incoming_cols)
             new_deleted = ",".join(board.deleted_columns) if board.deleted_columns is not None else row[4]
+
+            # Detect simple rename (one column changed in-place) and migrate tasks to keep statuses consistent
+            if board.columns is not None and len(incoming_cols) == len(current_cols):
+                diffs = [(old, new) for old, new in zip(current_cols, incoming_cols) if old != new]
+                if len(diffs) == 1:
+                    old_status, new_status = diffs[0]
+                    cur.execute(
+                        "UPDATE tasks SET status = %s WHERE board_id = %s AND status = %s",
+                        (new_status, board_id, old_status),
+                    )
 
             cur.execute(
                 "UPDATE boards SET name = %s, description = %s, columns = %s, deleted_columns = %s WHERE id = %s"
