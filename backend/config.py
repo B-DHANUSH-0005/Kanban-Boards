@@ -23,8 +23,13 @@ JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  # 24 h
 HOST: str = os.getenv("HOST", "127.0.0.1")
 PORT: int = int(os.getenv("PORT", "8000"))
 ALLOWED_ORIGINS: list[str] = [
-    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
 ]
+# Add known Vercel origins if not already present
+if "https://kanban-fe-seven.vercel.app" not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append("https://kanban-fe-seven.vercel.app")
+if "https://kanban-boards-ten.vercel.app" not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append("https://kanban-boards-ten.vercel.app")
 
 # ── Pagination ────────────────────────────────────────────────
 DEFAULT_PAGE_SIZE: int = int(os.getenv("DEFAULT_PAGE_SIZE", "20"))

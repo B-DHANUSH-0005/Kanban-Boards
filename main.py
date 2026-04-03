@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 
+import traceback
+from fastapi.responses import JSONResponse
 from config import HOST, PORT, ALLOWED_ORIGINS
 from db import create_tables
 from routers import boards, tasks, auth
@@ -44,6 +46,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"[ERROR] Global Crash Caught: {exc}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error. Please check backend logs.", "error": str(exc)},
+    )
 
 # ── Routers ───────────────────────────────────────────────────
 app.include_router(auth.router)

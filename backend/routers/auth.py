@@ -8,6 +8,7 @@ import smtplib
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import traceback
 
 from fastapi import APIRouter, HTTPException, status
 from db import db_conn
@@ -216,24 +217,40 @@ def reset_password(body: ResetPasswordRequest) -> dict:
             detail="Invalid or expired code.",
         )
 
-    with db_conn() as conn:
-        with conn.cursor() as cur:
-            # Check if the new password is the same as the old password
-            cur.execute("SELECT password FROM users WHERE LOWER(email_id) = %s", (email,))
-            row = cur.fetchone()
-            
-            if row and verify_password(body.new_password, row[0]):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="New password cannot be the same as the previous password."
+    try:
+        print(f"[AUTH] Reset password request for: {email}")
+        with db_conn() as conn:
+            with conn.cursor() as cur:
+                # Check if user exists first
+                cur.execute("SELECT id, password FROM users WHERE LOWER(email_id) = %s", (email,))
+                user_row = cur.fetchone()
+                
+                if not user_row:
+                    print(f"[AUTH] No user found for: {email}")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="User not found."
+                    )
+                
+                print(f"[AUTH] User found, checking password matches...")
+                if verify_password(body.new_password, user_row[1]):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="New password cannot be the same as the previous password."
+                    )
+
+                print(f"[AUTH] Updating password for user: {email}")
+                hashed = hash_password(body.new_password)
+                cur.execute(
+                    "UPDATE users SET password = %s WHERE id = %s",
+                    (hashed, user_row[0]),
                 )
+                conn.commit()
+                print(f"[AUTH] Update success for: {email}")
 
-            hashed = hash_password(body.new_password)
-            cur.execute(
-                "UPDATE users SET password = %s WHERE LOWER(email_id) = %s",
-                (hashed, email),
-            )
-            conn.commit()
-
-    _otp_store.pop(email, None)
-    return {"message": "Password updated successfully. You can now log in."}
+        _otp_store.pop(email, None)
+        return {"message": "Password updated successfully. You can now log in."}
+    except Exception as e:
+        print(f"[AUTH-RESET-ERROR] {e}")
+        traceback.print_exc()
+        raise
