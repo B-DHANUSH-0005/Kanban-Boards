@@ -20,8 +20,8 @@ export default function Navbar() {
       <Link to="/" className="navbar-brand">
         <span className="navbar-title">KANBOARDS</span>
       </Link>
-      <div className="navbar-right">
-        <span className="user-email">Hi, {username}</span>
+      <div className="navbar-actions">
+        <span className="user-email hide-on-small">Hi, {username}</span>
         {isBoardPage ? (
           <button 
             className="btn btn-outline" 

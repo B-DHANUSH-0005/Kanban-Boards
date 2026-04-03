@@ -82,6 +82,7 @@ export default function BoardPage() {
   const handleOpenEditTask = useCallback((task, e) => {
     e?.stopPropagation();
     setOpenMenuId(null);
+    setOpenSubMenuId(null);
     setEditingTask(task);
     setTaskModalOpen(true);
   }, []);
@@ -106,14 +107,28 @@ export default function BoardPage() {
     }
   };
 
+  const handleMoveTask = useCallback((task, status, e) => {
+    e?.stopPropagation();
+    setOpenMenuId(null);
+    setOpenSubMenuId(null);
+    moveTask(task, status);
+  }, [moveTask]);
+
+  const handleDeleteTask = useCallback(async (taskId, e) => {
+    e?.stopPropagation();
+    setOpenMenuId(null);
+    setOpenSubMenuId(null);
+    await deleteTask(taskId);
+  }, [deleteTask]);
+
   const handleTransferTask = useCallback(async (task, targetBoardId, targetBoardName, e) => {
     e?.stopPropagation();
     setOpenMenuId(null);
+    setOpenSubMenuId(null);
     
-    // Logic moved here for specific page behavior if needed, or could be in useBoard
     try {
       await tasksAPI.update(task.id, { board_id: targetBoardId });
-      showSuccess('Moved');
+      showSuccess(`Transferred to ${targetBoardName}`);
       updateTasksState(prev => prev.filter(t => t.id !== task.id));
     } catch(err) {
       showToast(err.message, true);
@@ -339,9 +354,9 @@ export default function BoardPage() {
               onEditTask={handleOpenEditTask}
               onToggleMenu={setOpenMenuId}
               onToggleSubMenu={setOpenSubMenuId}
-              onMoveTask={moveTask}
+              onMoveTask={handleMoveTask}
               onTransferTask={handleTransferTask}
-              onDeleteTask={deleteTask}
+              onDeleteTask={handleDeleteTask}
               statusLabel={statusLabel}
             />
           ))}

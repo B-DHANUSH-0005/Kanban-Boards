@@ -174,6 +174,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page animate-in">
+      <div className="auth-mobile-logo">KANBOARDS</div>
       <div className="auth-card">
         <div className="auth-header">
           <h1 id="login-heading">Welcome back</h1>

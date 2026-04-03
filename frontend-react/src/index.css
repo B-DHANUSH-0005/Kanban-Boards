@@ -357,12 +357,28 @@ button, input, textarea {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .column-label {
   font-weight: 800;
   font-size: 1.1rem;
   letter-spacing: -0.01em;
+}
+
+.col-rename-input {
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  border: none;
+  border-bottom: 2px solid #000;
+  padding: 0 0 2px;
+  background: transparent;
+  outline: none;
+  width: 130px;
+  max-width: 100%;
 }
 
 .task-count-badge {
@@ -562,12 +578,26 @@ button, input, textarea {
 /* ── Auth Pages ────────────────────────────────────────── */
 
 .auth-page {
-  background: var(--bg-page);
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  background: #fbfbfb;
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-mobile-logo {
+  display: none;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: #000;
+  margin-bottom: 30px;
+  text-align: center;
+  user-select: none;
 }
 
 .auth-card {
@@ -815,23 +845,234 @@ button, input, textarea {
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
+/* ── Responsive Refinements ────────────────────────────── */
+
+.hide-on-small { display: block; }
+
 @media (max-width: 768px) {
-  .navbar, .topbar { flex-wrap: wrap; height: auto; padding: 16px; gap: 12px; }
-  .dashboard-header, .page-header { flex-direction: column; align-items: flex-start; }
-  .search-input-field, .search-input { width: 100%; }
-  .boards-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .hide-on-small { display: none !important; }
   
-  /* Mobile menu sheet */
+  .navbar, .topbar { 
+    flex-wrap: nowrap; /* Keep them in one row if possible */
+    height: auto; 
+    padding: 12px 16px; 
+    gap: 8px; 
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .navbar-brand {
+    font-size: 1rem !important;
+    font-weight: 800;
+  }
+
+  .navbar-actions { 
+    width: auto; 
+    justify-content: flex-end; 
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .navbar-actions .btn {
+    padding: 6px 10px;
+    font-size: 0.75rem !important;
+  }
+
+  /* Main Dashboard Header */
+  .dashboard-header { 
+    flex-direction: column; 
+    align-items: flex-start !important; 
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .dashboard-title {
+    font-size: 1.25rem !important;
+    text-align: left;
+  }
+
+  .dashboard-subtitle {
+    font-size: 0.85rem !important;
+    text-align: left;
+  }
+  
+  .dashboard-header-right {
+    width: 100%;
+    margin-top: 4px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .search-container {
+    width: 100%;
+  }
+
+  .dashboard-search-long { 
+    width: 100% !important; 
+    max-width: 100% !important;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  /* Board View Header */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+
+  .board-title-wrapper {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .board-desc-inline {
+    width: 100%;
+    margin: 4px 0;
+    font-size: 0.8rem;
+  }
+
+  .boards-grid { 
+    grid-template-columns: 1fr; 
+    gap: 16px; 
+  }
+
+  /* Vertical Stacking for Kanban Board on Mobile */
+  .columns-outer-wrapper {
+    padding: 0 16px 40px;
+    overflow-x: hidden;
+  }
+
+  .columns-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    height: auto;
+  }
+
+  .column {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    flex: none;
+  }
+
+  .task-list {
+    max-height: none; /* Let the page scroll naturally */
+    overflow-y: visible;
+    padding-bottom: 8px;
+  }
+
+  .add-column-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+  }
+
+  /* Mobile Bottom Sheet (Dropdown Menu) */
   .dropdown-menu.active {
     position: fixed;
     top: auto;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
-    width: auto;
-    border-radius: 16px;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.25);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+    padding: 20px 16px 40px; /* Extra bottom for safe area */
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-bottom: none;
+    z-index: 10001;
   }
+
+  .auth-mobile-logo {
+    display: block;
+  }
+
+  .auth-page::before,
+  .auth-page::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 160px;
+    z-index: 0;
+    opacity: 1;
+    border-radius: 0;
+  }
+
+  /* Top Right Ribbon Decoration */
+  .auth-page::before {
+    top: 0;
+    right: 30px;
+    background: #000;
+    height: 160px;
+    width: 24px;
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 50% 90%, 0% 100%);
+  }
+
+  /* Bottom Left Ribbon Decoration */
+  .auth-page::after {
+    bottom: 0;
+    left: 30px;
+    background: #000;
+    height: 160px;
+    width: 24px;
+    clip-path: polygon(0% 10%, 50% 0%, 100% 10%, 100% 100%, 0% 100%);
+  }
+
+  .auth-card {
+    z-index: 1; /* Stay above accents */
+  }
+
+  .menu-header-mobile {
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    font-size: 1.25rem;
+  }
+
+  .menu-item {
+    padding: 14px 20px;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+
+  .submenu {
+    position: static;
+    display: block;
+    box-shadow: none;
+    border-left: 2px solid #eee;
+    margin-left: 20px;
+    margin-top: 8px;
+    padding: 0;
+    background: #f9f9f9;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-title { font-size: 1.5rem; }
+  .navbar-brand { font-size: 1.1rem; }
+  .btn-primary, .btn { padding: 8px 12px; font-size: 0.85rem; }
+  
+  .auth-card {
+    padding: 32px 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  }
+
+  .auth-header h1 { font-size: 1.5rem; }
+  .modal-header { padding: 16px 20px; }
+  .modal-body { padding: 20px; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 /* ── Modals ────────────────────────────────────────────── */
