@@ -1,0 +1,2 @@
+﻿Email: "test@example.com" | Hash: "$2b$12$IQRYMBpzaaJkBwFH4FVkUeKqNqGPJPdWCQvUKAtk0X2OjfVWw9XWe"
+Email: "basanidhanush9@gmail.com" | Hash: "$2b$12$ZcjXGb7xChDBVghkp2kTje/via55hC.QP8O7b/8.EpoU.WD1SlJ9y"

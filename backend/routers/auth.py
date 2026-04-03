@@ -109,6 +109,14 @@ def login(user: UserLogin) -> dict:
             )
             row = cur.fetchone()
 
+    # --- DEBUG LOGGING ---
+    print(f"[AUTH-DEBUG] Login attempt for: {user.email_id}")
+    if not row:
+        print(f"[AUTH-DEBUG] User NOT found in database.")
+    else:
+        print(f"[AUTH-DEBUG] User found. ID: {row[0]}, Comparing passwords...")
+    # ---------------------
+
     if not row or not verify_password(user.password, row[2]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
